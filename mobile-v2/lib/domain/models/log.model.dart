@@ -2,6 +2,7 @@ import 'package:logging/logging.dart';
 
 /// Log levels according to dart logging [Level]
 enum LogLevel {
+  // do not change this order!
   all,
   finest,
   finer,

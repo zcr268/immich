@@ -4,5 +4,12 @@
       "search": "Search",
       "sharing": "Sharing",
       "library": "Library"
+    },
+    "settings": {
+      "sections": {
+        "about": "About",
+        "general": "General",
+        "advance": "Advance"
+      }
     }
   }

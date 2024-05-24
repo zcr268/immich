@@ -1,6 +1,6 @@
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
-import 'package:immich_mobile/presentation/theme/utils/colors.dart';
+import 'package:immich_mobile/presentation/modules/theme/utils/colors.dart';
 
 class AppThemeBuilder extends StatelessWidget {
   const AppThemeBuilder({
