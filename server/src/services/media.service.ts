@@ -175,7 +175,7 @@ export class MediaService {
     return JobStatus.SUCCESS;
   }
 
-  async handleGeneratePreview({ id }: IEntityJob): Promise<JobStatus> {
+  async handleGenerateImages({ id }: IEntityJob): Promise<JobStatus> {
     const [{ image }, [asset]] = await Promise.all([
       this.configCore.getConfig(),
       this.assetRepository.getByIds([id], { exifInfo: true }),
@@ -188,86 +188,95 @@ export class MediaService {
       return JobStatus.SKIPPED;
     }
 
-    const previewPath = await this.generateThumbnail(asset, AssetPathType.PREVIEW, image.previewFormat);
+    let previewPath;
+    let thumbnailPath;
+    if (asset.type === AssetType.IMAGE) {
+      [previewPath, thumbnailPath] = await this.generateImageThumbnails(asset);
+    } else if (asset.type === AssetType.VIDEO) {
+      previewPath = await this.generateVideoThumbnail(asset, AssetPathType.PREVIEW, image.previewFormat);
+      thumbnailPath = await this.generateVideoThumbnail(asset, AssetPathType.THUMBNAIL, image.thumbnailFormat);
+    } else {
+      return JobStatus.SKIPPED;
+    }
+
+    await this.assetRepository.update({ id: asset.id, previewPath, thumbnailPath });
+
     if (asset.previewPath && asset.previewPath !== previewPath) {
       this.logger.debug(`Deleting old preview for asset ${asset.id}`);
       await this.storageRepository.unlink(asset.previewPath);
     }
-    await this.assetRepository.update({ id: asset.id, previewPath });
-    return JobStatus.SUCCESS;
-  }
 
-  private async generateThumbnail(asset: AssetEntity, type: GeneratedImageType, format: ImageFormat) {
-    const { image, ffmpeg } = await this.configCore.getConfig();
-    const size = type === AssetPathType.PREVIEW ? image.previewSize : image.thumbnailSize;
-    const path = StorageCore.getImagePath(asset, type, format);
-    this.storageCore.ensureFolders(path);
-
-    switch (asset.type) {
-      case AssetType.IMAGE: {
-        const shouldExtract = image.extractEmbedded && mimeTypes.isRaw(asset.originalPath);
-        const extractedPath = StorageCore.getTempPathInDir(dirname(path));
-        const didExtract = shouldExtract && (await this.mediaRepository.extract(asset.originalPath, extractedPath));
-
-        try {
-          const useExtracted = didExtract && (await this.shouldUseExtractedImage(extractedPath, image.previewSize));
-          const colorspace = this.isSRGB(asset) ? Colorspace.SRGB : image.colorspace;
-          const imageOptions = { format, size, colorspace, quality: image.quality };
-
-          const outputPath = useExtracted ? extractedPath : asset.originalPath;
-          await this.mediaRepository.generateThumbnail(outputPath, path, imageOptions);
-        } finally {
-          if (didExtract) {
-            await this.storageRepository.unlink(extractedPath);
-          }
-        }
-        break;
-      }
-
-      case AssetType.VIDEO: {
-        const { audioStreams, videoStreams } = await this.mediaRepository.probe(asset.originalPath);
-        const mainVideoStream = this.getMainStream(videoStreams);
-        if (!mainVideoStream) {
-          this.logger.warn(`Skipped thumbnail generation for asset ${asset.id}: no video streams found`);
-          return;
-        }
-        const mainAudioStream = this.getMainStream(audioStreams);
-        const config = { ...ffmpeg, targetResolution: size.toString() };
-        const options = new ThumbnailConfig(config).getOptions(TranscodeTarget.VIDEO, mainVideoStream, mainAudioStream);
-        await this.mediaRepository.transcode(asset.originalPath, path, options);
-        break;
-      }
-
-      default: {
-        throw new UnsupportedMediaTypeException(`Unsupported asset type for thumbnail generation: ${asset.type}`);
-      }
-    }
-    this.logger.log(
-      `Successfully generated ${format.toUpperCase()} ${asset.type.toLowerCase()} ${type} for asset ${asset.id}`,
-    );
-    return path;
-  }
-
-  async handleGenerateThumbnail({ id }: IEntityJob): Promise<JobStatus> {
-    const [{ image }, [asset]] = await Promise.all([
-      this.configCore.getConfig(),
-      this.assetRepository.getByIds([id], { exifInfo: true }),
-    ]);
-    if (!asset) {
-      return JobStatus.FAILED;
-    }
-
-    if (!asset.isVisible) {
-      return JobStatus.SKIPPED;
-    }
-
-    const thumbnailPath = await this.generateThumbnail(asset, AssetPathType.THUMBNAIL, image.thumbnailFormat);
     if (asset.thumbnailPath && asset.thumbnailPath !== thumbnailPath) {
       this.logger.debug(`Deleting old thumbnail for asset ${asset.id}`);
       await this.storageRepository.unlink(asset.thumbnailPath);
     }
-    await this.assetRepository.update({ id: asset.id, thumbnailPath });
+
     return JobStatus.SUCCESS;
+  }
+
+  private async generateImageThumbnails(asset: AssetEntity) {
+    const { image } = await this.configCore.getConfig();
+    const previewPath = StorageCore.getImagePath(asset, AssetPathType.PREVIEW, image.previewFormat);
+    const thumbnailPath = StorageCore.getImagePath(asset, AssetPathType.THUMBNAIL, image.thumbnailFormat);
+    this.storageCore.ensureFolders(previewPath);
+
+    const shouldExtract = image.extractEmbedded && mimeTypes.isRaw(asset.originalPath);
+    const extractedPath = StorageCore.getTempPathInDir(previewPath);
+    const didExtract = shouldExtract && (await this.mediaRepository.extract(asset.originalPath, extractedPath));
+
+    try {
+      const useExtracted = didExtract && (await this.shouldUseExtractedImage(extractedPath, image.previewSize));
+      const colorspace = this.isSRGB(asset) ? Colorspace.SRGB : image.colorspace;
+      const imageOptions = {
+        colorspace,
+        outputs: [
+          {
+            format: image.previewFormat,
+            path: previewPath,
+            quality: image.quality,
+            size: image.previewSize,
+          },
+          {
+            format: image.thumbnailFormat,
+            path: thumbnailPath,
+            quality: image.quality,
+            size: image.thumbnailSize,
+          },
+        ],
+      };
+
+      const outputPath = useExtracted ? extractedPath : asset.originalPath;
+      await this.mediaRepository.generateImage(outputPath, imageOptions);
+    } finally {
+      if (didExtract) {
+        await this.storageRepository.unlink(extractedPath);
+      }
+    }
+
+    return [previewPath, thumbnailPath];
+  }
+
+  private async generateVideoThumbnail(asset: AssetEntity, type: GeneratedImageType, format: ImageFormat) {
+    const { image, ffmpeg } = await this.configCore.getConfig();
+    const path = StorageCore.getImagePath(asset, type, format);
+    const size = type === AssetPathType.PREVIEW ? image.previewSize : image.thumbnailSize;
+    this.storageCore.ensureFolders(path);
+
+    const { audioStreams, videoStreams } = await this.mediaRepository.probe(asset.originalPath);
+    const mainVideoStream = this.getMainStream(videoStreams);
+    if (!mainVideoStream) {
+      this.logger.warn(`Skipped thumbnail generation for asset ${asset.id}: no video streams found`);
+      return;
+    }
+    const mainAudioStream = this.getMainStream(audioStreams);
+    const config = { ...ffmpeg, targetResolution: size.toString() };
+    const options = new ThumbnailConfig(config).getOptions(TranscodeTarget.VIDEO, mainVideoStream, mainAudioStream);
+    await this.mediaRepository.transcode(asset.originalPath, path, options);
+
+    this.logger.log(
+      `Successfully generated ${format.toUpperCase()} ${asset.type.toLowerCase()} ${type} for asset ${asset.id}`,
+    );
+    return path;
   }
 
   async handleGenerateThumbhash({ id }: IEntityJob): Promise<JobStatus> {

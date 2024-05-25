@@ -10,12 +10,17 @@ export interface CropOptions {
   height: number;
 }
 
-export interface ThumbnailOptions {
-  size: number;
-  format: ImageFormat;
-  colorspace: string;
-  quality: number;
+export interface ImageOptions {
   crop?: CropOptions;
+  format: ImageFormat;
+  path: string;
+  quality: number;
+  size: number;
+}
+
+export interface GenerateImageOptions {
+  colorspace: string;
+  outputs: ImageOptions[];
 }
 
 export interface VideoStreamInfo {
@@ -77,7 +82,7 @@ export interface VideoCodecHWConfig extends VideoCodecSWConfig {
 export interface IMediaRepository {
   // image
   extract(input: string, output: string): Promise<boolean>;
-  generateThumbnail(input: string | Buffer, output: string, options: ThumbnailOptions): Promise<void>;
+  generateImage(input: string | Buffer, options: GenerateImageOptions): Promise<void>;
   generateThumbhash(imagePath: string): Promise<Buffer>;
   getImageDimensions(input: string): Promise<ImageDimensions>;
 
