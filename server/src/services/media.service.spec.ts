@@ -212,7 +212,7 @@ describe(MediaService.name, () => {
     it('should skip thumbnail generation if asset not found', async () => {
       assetMock.getByIds.mockResolvedValue([]);
       await sut.handleGenerateThumbnails({ id: assetStub.image.id });
-      expect(mediaMock.generateThumbnail).not.toHaveBeenCalled();
+      expect(mediaMock.generateThumbnails).not.toHaveBeenCalled();
       expect(assetMock.update).not.toHaveBeenCalledWith();
     });
 
@@ -220,7 +220,7 @@ describe(MediaService.name, () => {
       mediaMock.probe.mockResolvedValue(probeStub.noVideoStreams);
       assetMock.getByIds.mockResolvedValue([assetStub.video]);
       await sut.handleGenerateThumbnails({ id: assetStub.image.id });
-      expect(mediaMock.generateThumbnail).not.toHaveBeenCalled();
+      expect(mediaMock.generateThumbnails).not.toHaveBeenCalled();
       expect(assetMock.update).not.toHaveBeenCalledWith();
     });
 
@@ -229,7 +229,7 @@ describe(MediaService.name, () => {
 
       expect(await sut.handleGenerateThumbnails({ id: assetStub.livePhotoMotionAsset.id })).toEqual(JobStatus.SKIPPED);
 
-      expect(mediaMock.generateThumbnail).not.toHaveBeenCalled();
+      expect(mediaMock.generateThumbnails).not.toHaveBeenCalled();
       expect(assetMock.update).not.toHaveBeenCalledWith();
     });
 
@@ -244,7 +244,7 @@ describe(MediaService.name, () => {
         await sut.handleGenerateThumbnails({ id: assetStub.image.id });
 
         expect(storageMock.mkdirSync).toHaveBeenCalledWith('upload/thumbs/user-id/as/se');
-        expect(mediaMock.generateThumbnail).toHaveBeenCalledWith('/original/path.jpg', {
+        expect(mediaMock.generateThumbnails).toHaveBeenCalledWith('/original/path.jpg', {
           colorspace: Colorspace.SRGB,
           preview: {
             format,
@@ -279,7 +279,7 @@ describe(MediaService.name, () => {
       await sut.handleGenerateThumbnails({ id: assetStub.image.id });
 
       expect(storageMock.mkdirSync).toHaveBeenCalledWith('upload/thumbs/user-id/as/se');
-      expect(mediaMock.generateThumbnail).toHaveBeenCalledWith(assetStub.imageDng.originalPath, {
+      expect(mediaMock.generateThumbnails).toHaveBeenCalledWith(assetStub.imageDng.originalPath, {
         colorspace: Colorspace.P3,
         preview: {
           format: ImageFormat.JPEG,
@@ -310,7 +310,7 @@ describe(MediaService.name, () => {
       await sut.handleGenerateThumbnails({ id: assetStub.image.id });
 
       const extractedPath = mediaMock.extract.mock.calls.at(-1)?.[1].toString();
-      expect(mediaMock.generateThumbnail.mock.calls).toEqual([
+      expect(mediaMock.generateThumbnails.mock.calls).toEqual([
         [
           extractedPath,
           {
@@ -342,7 +342,7 @@ describe(MediaService.name, () => {
 
       await sut.handleGenerateThumbnails({ id: assetStub.image.id });
 
-      expect(mediaMock.generateThumbnail.mock.calls).toEqual([
+      expect(mediaMock.generateThumbnails.mock.calls).toEqual([
         [
           assetStub.imageDng.originalPath,
           {
@@ -373,7 +373,7 @@ describe(MediaService.name, () => {
 
       await sut.handleGenerateThumbnails({ id: assetStub.image.id });
 
-      expect(mediaMock.generateThumbnail).toHaveBeenCalledWith(assetStub.imageDng.originalPath, {
+      expect(mediaMock.generateThumbnails).toHaveBeenCalledWith(assetStub.imageDng.originalPath, {
         colorspace: Colorspace.P3,
         preview: {
           format: ImageFormat.JPEG,
@@ -398,7 +398,7 @@ describe(MediaService.name, () => {
       await sut.handleGenerateThumbnails({ id: assetStub.image.id });
 
       expect(mediaMock.extract).not.toHaveBeenCalled();
-      expect(mediaMock.generateThumbnail).toHaveBeenCalledWith(assetStub.imageDng.originalPath, {
+      expect(mediaMock.generateThumbnails).toHaveBeenCalledWith(assetStub.imageDng.originalPath, {
         colorspace: Colorspace.P3,
         preview: {
           format: ImageFormat.JPEG,

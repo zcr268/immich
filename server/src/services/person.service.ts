@@ -564,7 +564,7 @@ export class PersonService {
       },
     };
 
-    await this.mediaRepository.generateThumbnail(asset.originalPath, thumbnailOptions);
+    await this.mediaRepository.generateThumbnails(asset.originalPath, thumbnailOptions);
     await this.repository.update({ id: person.id, thumbnailPath });
 
     return JobStatus.SUCCESS;
