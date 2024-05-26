@@ -555,18 +555,16 @@ export class PersonService {
 
     const thumbnailOptions = {
       colorspace: image.colorspace,
-      outputs: [
-        {
-          format: ImageFormat.JPEG,
-          path: thumbnailPath,
-          size: FACE_THUMBNAIL_SIZE,
-          quality: image.quality,
-          crop: cropOptions,
-        },
-      ],
+      thumbnail: {
+        format: ImageFormat.JPEG,
+        path: thumbnailPath,
+        size: FACE_THUMBNAIL_SIZE,
+        quality: image.quality,
+        crop: cropOptions,
+      },
     };
 
-    await this.mediaRepository.generateImage(asset.originalPath, thumbnailOptions);
+    await this.mediaRepository.generateThumbnail(asset.originalPath, thumbnailOptions);
     await this.repository.update({ id: person.id, thumbnailPath });
 
     return JobStatus.SUCCESS;

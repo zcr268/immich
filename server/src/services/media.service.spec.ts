@@ -1,5 +1,4 @@
 import { Stats } from 'node:fs';
-import path from 'node:path';
 import {
   AudioCodec,
   Colorspace,
@@ -94,7 +93,7 @@ describe(MediaService.name, () => {
       expect(assetMock.getWithout).not.toHaveBeenCalled();
       expect(jobMock.queueAll).toHaveBeenCalledWith([
         {
-          name: JobName.GENERATE_PREVIEW,
+          name: JobName.GENERATE_THUMBNAILS,
           data: { id: assetStub.image.id },
         },
       ]);
@@ -152,7 +151,7 @@ describe(MediaService.name, () => {
       expect(assetMock.getWithout).toHaveBeenCalledWith({ skip: 0, take: 1000 }, WithoutProperty.THUMBNAIL);
       expect(jobMock.queueAll).toHaveBeenCalledWith([
         {
-          name: JobName.GENERATE_PREVIEW,
+          name: JobName.GENERATE_THUMBNAILS,
           data: { id: assetStub.image.id },
         },
       ]);
@@ -176,7 +175,7 @@ describe(MediaService.name, () => {
       expect(assetMock.getWithout).toHaveBeenCalledWith({ skip: 0, take: 1000 }, WithoutProperty.THUMBNAIL);
       expect(jobMock.queueAll).toHaveBeenCalledWith([
         {
-          name: JobName.GENERATE_THUMBNAIL,
+          name: JobName.GENERATE_THUMBNAILS,
           data: { id: assetStub.image.id },
         },
       ]);
@@ -209,205 +208,58 @@ describe(MediaService.name, () => {
     });
   });
 
-  describe('handleGeneratePreview', () => {
+  describe('handleGenerateThumbnails', () => {
     it('should skip thumbnail generation if asset not found', async () => {
       assetMock.getByIds.mockResolvedValue([]);
-      await sut.handleGenerateImages({ id: assetStub.image.id });
-      expect(mediaMock.generateImage).not.toHaveBeenCalled();
+      await sut.handleGenerateThumbnails({ id: assetStub.image.id });
+      expect(mediaMock.generateThumbnail).not.toHaveBeenCalled();
       expect(assetMock.update).not.toHaveBeenCalledWith();
     });
 
     it('should skip video thumbnail generation if no video stream', async () => {
       mediaMock.probe.mockResolvedValue(probeStub.noVideoStreams);
       assetMock.getByIds.mockResolvedValue([assetStub.video]);
-      await sut.handleGenerateImages({ id: assetStub.image.id });
-      expect(mediaMock.generateImage).not.toHaveBeenCalled();
+      await sut.handleGenerateThumbnails({ id: assetStub.image.id });
+      expect(mediaMock.generateThumbnail).not.toHaveBeenCalled();
       expect(assetMock.update).not.toHaveBeenCalledWith();
     });
 
     it('should skip invisible assets', async () => {
       assetMock.getByIds.mockResolvedValue([assetStub.livePhotoMotionAsset]);
 
-      expect(await sut.handleGenerateImages({ id: assetStub.livePhotoMotionAsset.id })).toEqual(JobStatus.SKIPPED);
+      expect(await sut.handleGenerateThumbnails({ id: assetStub.livePhotoMotionAsset.id })).toEqual(JobStatus.SKIPPED);
 
-      expect(mediaMock.generateImage).not.toHaveBeenCalled();
-      expect(assetMock.update).not.toHaveBeenCalledWith();
-    });
-
-    it.each(Object.values(ImageFormat))('should generate a %s preview for an image when specified', async (format) => {
-      systemMock.get.mockResolvedValue({ image: { previewFormat: format } });
-      assetMock.getByIds.mockResolvedValue([assetStub.image]);
-      const previewPath = `upload/thumbs/user-id/as/se/asset-id-preview.${format}`;
-
-      await sut.handleGenerateImages({ id: assetStub.image.id });
-
-      expect(storageMock.mkdirSync).toHaveBeenCalledWith('upload/thumbs/user-id/as/se');
-      expect(mediaMock.generateImage).toHaveBeenCalledWith('/original/path.jpg', {
-        colorspace: Colorspace.SRGB,
-        outputs: [
-          {
-            size: 1440,
-            format,
-            path: previewPath,
-            quality: 80,
-          },
-        ],
-      });
-      expect(assetMock.update).toHaveBeenCalledWith({ id: 'asset-id', previewPath });
-    });
-
-    it('should delete previous preview if different path', async () => {
-      const previousPreviewPath = assetStub.image.previewPath;
-
-      systemMock.get.mockResolvedValue({ image: { thumbnailFormat: ImageFormat.WEBP } });
-      assetMock.getByIds.mockResolvedValue([assetStub.image]);
-
-      await sut.handleGenerateImages({ id: assetStub.image.id });
-
-      expect(storageMock.unlink).toHaveBeenCalledWith(previousPreviewPath);
-    });
-
-    it('should generate a P3 thumbnail for a wide gamut image', async () => {
-      assetMock.getByIds.mockResolvedValue([
-        { ...assetStub.image, exifInfo: { profileDescription: 'Adobe RGB', bitsPerSample: 14 } as ExifEntity },
-      ]);
-      await sut.handleGenerateImages({ id: assetStub.image.id });
-
-      expect(storageMock.mkdirSync).toHaveBeenCalledWith('upload/thumbs/user-id/as/se');
-      expect(mediaMock.generateImage).toHaveBeenCalledWith(
-        '/original/path.jpg',
-        'upload/thumbs/user-id/as/se/asset-id-preview.jpeg',
-        {
-          size: 1440,
-          format: ImageFormat.JPEG,
-          quality: 80,
-          colorspace: Colorspace.P3,
-        },
-      );
-      expect(assetMock.update).toHaveBeenCalledWith({
-        id: 'asset-id',
-        previewPath: 'upload/thumbs/user-id/as/se/asset-id-preview.jpeg',
-      });
-    });
-
-    it('should generate a thumbnail for a video', async () => {
-      mediaMock.probe.mockResolvedValue(probeStub.videoStream2160p);
-      assetMock.getByIds.mockResolvedValue([assetStub.video]);
-      await sut.handleGenerateImages({ id: assetStub.video.id });
-
-      expect(storageMock.mkdirSync).toHaveBeenCalledWith('upload/thumbs/user-id/as/se');
-      expect(mediaMock.transcode).toHaveBeenCalledWith(
-        '/original/path.ext',
-        'upload/thumbs/user-id/as/se/asset-id-preview.jpeg',
-        {
-          inputOptions: ['-ss 00:00:00', '-sws_flags accurate_rnd+bitexact+full_chroma_int'],
-          outputOptions: [
-            '-frames:v 1',
-            '-v verbose',
-            '-vf scale=-2:1440:flags=lanczos+accurate_rnd+bitexact+full_chroma_int:out_color_matrix=601:out_range=pc,format=yuv420p',
-          ],
-          twoPass: false,
-        },
-      );
-      expect(assetMock.update).toHaveBeenCalledWith({
-        id: 'asset-id',
-        previewPath: 'upload/thumbs/user-id/as/se/asset-id-preview.jpeg',
-      });
-    });
-
-    it('should tonemap thumbnail for hdr video', async () => {
-      mediaMock.probe.mockResolvedValue(probeStub.videoStreamHDR);
-      assetMock.getByIds.mockResolvedValue([assetStub.video]);
-      await sut.handleGenerateImages({ id: assetStub.video.id });
-
-      expect(storageMock.mkdirSync).toHaveBeenCalledWith('upload/thumbs/user-id/as/se');
-      expect(mediaMock.transcode).toHaveBeenCalledWith(
-        '/original/path.ext',
-        'upload/thumbs/user-id/as/se/asset-id-preview.jpeg',
-        {
-          inputOptions: ['-ss 00:00:00', '-sws_flags accurate_rnd+bitexact+full_chroma_int'],
-          outputOptions: [
-            '-frames:v 1',
-            '-v verbose',
-            '-vf zscale=t=linear:npl=100,tonemap=hable:desat=0,zscale=p=bt709:t=601:m=bt470bg:range=pc,format=yuv420p',
-          ],
-          twoPass: false,
-        },
-      );
-      expect(assetMock.update).toHaveBeenCalledWith({
-        id: 'asset-id',
-        previewPath: 'upload/thumbs/user-id/as/se/asset-id-preview.jpeg',
-      });
-    });
-
-    it('should always generate video thumbnail in one pass', async () => {
-      mediaMock.probe.mockResolvedValue(probeStub.videoStreamHDR);
-      systemMock.get.mockResolvedValue({
-        ffmpeg: { twoPass: true, maxBitrate: '5000k' },
-      });
-      assetMock.getByIds.mockResolvedValue([assetStub.video]);
-      await sut.handleGenerateImages({ id: assetStub.video.id });
-
-      expect(mediaMock.transcode).toHaveBeenCalledWith(
-        '/original/path.ext',
-        'upload/thumbs/user-id/as/se/asset-id-preview.jpeg',
-        {
-          inputOptions: ['-ss 00:00:00', '-sws_flags accurate_rnd+bitexact+full_chroma_int'],
-          outputOptions: [
-            '-frames:v 1',
-            '-v verbose',
-            '-vf zscale=t=linear:npl=100,tonemap=hable:desat=0,zscale=p=bt709:t=601:m=bt470bg:range=pc,format=yuv420p',
-          ],
-          twoPass: false,
-        },
-      );
-    });
-
-    it('should run successfully', async () => {
-      assetMock.getByIds.mockResolvedValue([assetStub.image]);
-      await sut.handleGenerateImages({ id: assetStub.image.id });
-    });
-  });
-
-  describe('handleGenerateThumbnail', () => {
-    it('should skip thumbnail generation if asset not found', async () => {
-      assetMock.getByIds.mockResolvedValue([]);
-      await sut.handleGenerateThumbnail({ id: assetStub.image.id });
-      expect(mediaMock.generateImage).not.toHaveBeenCalled();
-      expect(assetMock.update).not.toHaveBeenCalledWith();
-    });
-
-    it('should skip invisible assets', async () => {
-      assetMock.getByIds.mockResolvedValue([assetStub.livePhotoMotionAsset]);
-
-      expect(await sut.handleGenerateThumbnail({ id: assetStub.livePhotoMotionAsset.id })).toEqual(JobStatus.SKIPPED);
-
-      expect(mediaMock.generateImage).not.toHaveBeenCalled();
+      expect(mediaMock.generateThumbnail).not.toHaveBeenCalled();
       expect(assetMock.update).not.toHaveBeenCalledWith();
     });
 
     it.each(Object.values(ImageFormat))(
       'should generate a %s thumbnail for an image when specified',
       async (format) => {
-        systemMock.get.mockResolvedValue({ image: { thumbnailFormat: format } });
+        systemMock.get.mockResolvedValue({ image: { previewFormat: format, thumbnailFormat: format } });
         assetMock.getByIds.mockResolvedValue([assetStub.image]);
+        const previewPath = `upload/thumbs/user-id/as/se/asset-id-preview.${format}`;
         const thumbnailPath = `upload/thumbs/user-id/as/se/asset-id-thumbnail.${format}`;
 
-        await sut.handleGenerateThumbnail({ id: assetStub.image.id });
+        await sut.handleGenerateThumbnails({ id: assetStub.image.id });
 
         expect(storageMock.mkdirSync).toHaveBeenCalledWith('upload/thumbs/user-id/as/se');
-        expect(mediaMock.generateImage).toHaveBeenCalledWith('/original/path.jpg', {
+        expect(mediaMock.generateThumbnail).toHaveBeenCalledWith('/original/path.jpg', {
           colorspace: Colorspace.SRGB,
-          outputs: [
-            {
-              size: 250,
-              format,
-              path: thumbnailPath,
-              quality: 80,
-            },
-          ],
+          preview: {
+            format,
+            path: previewPath,
+            size: 1440,
+            quality: 80,
+          },
+          thumbnail: {
+            format,
+            path: thumbnailPath,
+            size: 250,
+            quality: 80,
+          },
         });
-        expect(assetMock.update).toHaveBeenCalledWith({ id: 'asset-id', thumbnailPath });
+        expect(assetMock.update).toHaveBeenCalledWith({ id: 'asset-id', previewPath, thumbnailPath });
       },
     );
 
@@ -417,133 +269,261 @@ describe(MediaService.name, () => {
       systemMock.get.mockResolvedValue({ image: { thumbnailFormat: ImageFormat.WEBP } });
       assetMock.getByIds.mockResolvedValue([assetStub.image]);
 
-      await sut.handleGenerateThumbnail({ id: assetStub.image.id });
+      await sut.handleGenerateThumbnails({ id: assetStub.image.id });
 
       expect(storageMock.unlink).toHaveBeenCalledWith(previousThumbnailPath);
     });
-  });
 
-  it('should generate a P3 thumbnail for a wide gamut image', async () => {
-    assetMock.getByIds.mockResolvedValue([assetStub.imageDng]);
-    await sut.handleGenerateThumbnail({ id: assetStub.image.id });
+    it('should generate a P3 thumbnail for a wide gamut image', async () => {
+      assetMock.getByIds.mockResolvedValue([assetStub.imageDng]);
+      await sut.handleGenerateThumbnails({ id: assetStub.image.id });
 
-    expect(storageMock.mkdirSync).toHaveBeenCalledWith('upload/thumbs/user-id/as/se');
-    expect(mediaMock.generateImage).toHaveBeenCalledWith(
-      assetStub.imageDng.originalPath,
-      'upload/thumbs/user-id/as/se/asset-id-thumbnail.webp',
-      {
+      expect(storageMock.mkdirSync).toHaveBeenCalledWith('upload/thumbs/user-id/as/se');
+      expect(mediaMock.generateThumbnail).toHaveBeenCalledWith(assetStub.imageDng.originalPath, {
         colorspace: Colorspace.P3,
-        outputs: [
+        preview: {
+          format: ImageFormat.JPEG,
+          path: 'upload/thumbs/user-id/as/se/asset-id-preview.jpeg',
+          size: 1440,
+          quality: 80,
+        },
+        thumbnail: {
+          format: ImageFormat.WEBP,
+          path: 'upload/thumbs/user-id/as/se/asset-id-thumbnail.webp',
+          size: 250,
+          quality: 80,
+        },
+      });
+      expect(assetMock.update).toHaveBeenCalledWith({
+        id: 'asset-id',
+        previewPath: 'upload/thumbs/user-id/as/se/asset-id-preview.jpeg',
+        thumbnailPath: 'upload/thumbs/user-id/as/se/asset-id-thumbnail.webp',
+      });
+    });
+
+    it('should extract embedded image if enabled and available', async () => {
+      mediaMock.extract.mockResolvedValue(true);
+      mediaMock.getImageDimensions.mockResolvedValue({ width: 3840, height: 2160 });
+      systemMock.get.mockResolvedValue({ image: { extractEmbedded: true } });
+      assetMock.getByIds.mockResolvedValue([assetStub.imageDng]);
+
+      await sut.handleGenerateThumbnails({ id: assetStub.image.id });
+
+      const extractedPath = mediaMock.extract.mock.calls.at(-1)?.[1].toString();
+      expect(mediaMock.generateThumbnail.mock.calls).toEqual([
+        [
+          extractedPath,
           {
-            format: ImageFormat.WEBP,
-            path: 'upload/thumbs/user-id/as/se/asset-id-thumbnail.webp',
-            size: 250,
-            quality: 80,
+            colorspace: Colorspace.P3,
+            preview: {
+              format: ImageFormat.JPEG,
+              path: 'upload/thumbs/user-id/as/se/asset-id-preview.jpeg',
+              size: 1440,
+              quality: 80,
+            },
+            thumbnail: {
+              format: ImageFormat.WEBP,
+              path: 'upload/thumbs/user-id/as/se/asset-id-thumbnail.webp',
+              size: 250,
+              quality: 80,
+            },
           },
         ],
-      },
-    );
-    expect(assetMock.update).toHaveBeenCalledWith({
-      id: 'asset-id',
-      thumbnailPath: 'upload/thumbs/user-id/as/se/asset-id-thumbnail.webp',
+      ]);
+      expect(extractedPath?.endsWith('.tmp')).toBe(true);
+      expect(storageMock.unlink).toHaveBeenCalledWith(extractedPath);
     });
-  });
 
-  it('should extract embedded image if enabled and available', async () => {
-    mediaMock.extract.mockResolvedValue(true);
-    mediaMock.getImageDimensions.mockResolvedValue({ width: 3840, height: 2160 });
-    systemMock.get.mockResolvedValue({ image: { extractEmbedded: true } });
-    assetMock.getByIds.mockResolvedValue([assetStub.imageDng]);
+    it('should resize original image if embedded image is too small', async () => {
+      mediaMock.extract.mockResolvedValue(true);
+      mediaMock.getImageDimensions.mockResolvedValue({ width: 1000, height: 1000 });
+      systemMock.get.mockResolvedValue({ image: { extractEmbedded: true } });
+      assetMock.getByIds.mockResolvedValue([assetStub.imageDng]);
 
-    await sut.handleGenerateThumbnail({ id: assetStub.image.id });
+      await sut.handleGenerateThumbnails({ id: assetStub.image.id });
 
-    const extractedPath = mediaMock.extract.mock.calls.at(-1)?.[1].toString();
-    expect(mediaMock.generateImage.mock.calls).toEqual([
-      [
-        extractedPath,
-        {
-          colorspace: Colorspace.P3,
-          outputs: [
-            {
+      expect(mediaMock.generateThumbnail.mock.calls).toEqual([
+        [
+          assetStub.imageDng.originalPath,
+          {
+            colorspace: Colorspace.P3,
+            preview: {
+              format: ImageFormat.JPEG,
+              path: 'upload/thumbs/user-id/as/se/asset-id-preview.jpeg',
+              size: 1440,
+              quality: 80,
+            },
+            thumbnail: {
               format: ImageFormat.WEBP,
               path: 'upload/thumbs/user-id/as/se/asset-id-thumbnail.webp',
               size: 250,
               quality: 80,
             },
-          ],
-        },
-      ],
-    ]);
-    expect(extractedPath?.endsWith('.tmp')).toBe(true);
-    expect(storageMock.unlink).toHaveBeenCalledWith(extractedPath);
-  });
+          },
+        ],
+      ]);
+      const extractedPath = mediaMock.extract.mock.calls.at(-1)?.[1].toString();
+      expect(extractedPath?.endsWith('.tmp')).toBe(true);
+      expect(storageMock.unlink).toHaveBeenCalledWith(extractedPath);
+    });
 
-  it('should resize original image if embedded image is too small', async () => {
-    mediaMock.extract.mockResolvedValue(true);
-    mediaMock.getImageDimensions.mockResolvedValue({ width: 1000, height: 1000 });
-    systemMock.get.mockResolvedValue({ image: { extractEmbedded: true } });
-    assetMock.getByIds.mockResolvedValue([assetStub.imageDng]);
+    it('should resize original image if embedded image not found', async () => {
+      systemMock.get.mockResolvedValue({ image: { extractEmbedded: true } });
+      assetMock.getByIds.mockResolvedValue([assetStub.imageDng]);
 
-    await sut.handleGenerateThumbnail({ id: assetStub.image.id });
+      await sut.handleGenerateThumbnails({ id: assetStub.image.id });
 
-    expect(mediaMock.generateImage.mock.calls).toEqual([
-      [
-        assetStub.imageDng.originalPath,
-        {
-          colorspace: Colorspace.P3,
-          outputs: [
-            {
-              format: ImageFormat.WEBP,
-              path: 'upload/thumbs/user-id/as/se/asset-id-thumbnail.webp',
-              size: 250,
-              quality: 80,
-            },
-          ],
-        },
-      ],
-    ]);
-    const extractedPath = mediaMock.extract.mock.calls.at(-1)?.[1].toString();
-    expect(extractedPath?.endsWith('.tmp')).toBe(true);
-    expect(storageMock.unlink).toHaveBeenCalledWith(extractedPath);
-  });
-
-  it('should resize original image if embedded image not found', async () => {
-    systemMock.get.mockResolvedValue({ image: { extractEmbedded: true } });
-    assetMock.getByIds.mockResolvedValue([assetStub.imageDng]);
-
-    await sut.handleGenerateThumbnail({ id: assetStub.image.id });
-
-    expect(mediaMock.generateImage).toHaveBeenCalledWith(
-      assetStub.imageDng.originalPath,
-      'upload/thumbs/user-id/as/se/asset-id-thumbnail.webp',
-      {
-        format: ImageFormat.WEBP,
-        size: 250,
-        quality: 80,
+      expect(mediaMock.generateThumbnail).toHaveBeenCalledWith(assetStub.imageDng.originalPath, {
         colorspace: Colorspace.P3,
-      },
-    );
-    expect(mediaMock.getImageDimensions).not.toHaveBeenCalled();
-  });
+        preview: {
+          format: ImageFormat.JPEG,
+          path: 'upload/thumbs/user-id/as/se/asset-id-preview.jpeg',
+          size: 1440,
+          quality: 80,
+        },
+        thumbnail: {
+          format: ImageFormat.WEBP,
+          path: 'upload/thumbs/user-id/as/se/asset-id-thumbnail.webp',
+          size: 250,
+          quality: 80,
+        },
+      });
+      expect(mediaMock.getImageDimensions).not.toHaveBeenCalled();
+    });
 
-  it('should resize original image if embedded image extraction is not enabled', async () => {
-    systemMock.get.mockResolvedValue({ image: { extractEmbedded: false } });
-    assetMock.getByIds.mockResolvedValue([assetStub.imageDng]);
+    it('should resize original image if embedded image extraction is not enabled', async () => {
+      systemMock.get.mockResolvedValue({ image: { extractEmbedded: false } });
+      assetMock.getByIds.mockResolvedValue([assetStub.imageDng]);
 
-    await sut.handleGenerateThumbnail({ id: assetStub.image.id });
+      await sut.handleGenerateThumbnails({ id: assetStub.image.id });
 
-    expect(mediaMock.extract).not.toHaveBeenCalled();
-    expect(mediaMock.generateImage).toHaveBeenCalledWith(
-      assetStub.imageDng.originalPath,
-      'upload/thumbs/user-id/as/se/asset-id-thumbnail.webp',
-      {
-        format: ImageFormat.WEBP,
-        size: 250,
-        quality: 80,
+      expect(mediaMock.extract).not.toHaveBeenCalled();
+      expect(mediaMock.generateThumbnail).toHaveBeenCalledWith(assetStub.imageDng.originalPath, {
         colorspace: Colorspace.P3,
-      },
-    );
-    expect(mediaMock.getImageDimensions).not.toHaveBeenCalled();
+        preview: {
+          format: ImageFormat.JPEG,
+          path: 'upload/thumbs/user-id/as/se/asset-id-preview.jpeg',
+          size: 1440,
+          quality: 80,
+        },
+        thumbnail: {
+          format: ImageFormat.WEBP,
+          path: 'upload/thumbs/user-id/as/se/asset-id-thumbnail.webp',
+          size: 250,
+          quality: 80,
+        },
+      });
+      expect(mediaMock.getImageDimensions).not.toHaveBeenCalled();
+    });
+
+    it('should generate a thumbnail for a video', async () => {
+      mediaMock.probe.mockResolvedValue(probeStub.videoStream2160p);
+      assetMock.getByIds.mockResolvedValue([assetStub.video]);
+      const previewPath = `upload/thumbs/user-id/as/se/asset-id-preview.jpeg`;
+      const thumbnailPath = `upload/thumbs/user-id/as/se/asset-id-thumbnail.webp`;
+
+      await sut.handleGenerateThumbnails({ id: assetStub.video.id });
+
+      expect(storageMock.mkdirSync).toHaveBeenCalledWith('upload/thumbs/user-id/as/se');
+      expect(mediaMock.transcode.mock.calls).toEqual([
+        [
+          '/original/path.ext',
+          previewPath,
+          {
+            inputOptions: ['-ss 00:00:00', '-sws_flags accurate_rnd+full_chroma_int'],
+            outputOptions: [
+              '-frames:v 1',
+              '-v verbose',
+              '-vf scale=-2:1440:flags=lanczos+accurate_rnd+full_chroma_int:out_color_matrix=601:out_range=pc,format=yuv420p',
+            ],
+            twoPass: false,
+          },
+        ],
+        [
+          '/original/path.ext',
+          thumbnailPath,
+          {
+            inputOptions: ['-ss 00:00:00', '-sws_flags accurate_rnd+full_chroma_int'],
+            outputOptions: [
+              '-frames:v 1',
+              '-v verbose',
+              '-vf scale=-2:250:flags=lanczos+accurate_rnd+full_chroma_int:out_color_matrix=601:out_range=pc,format=yuv420p',
+            ],
+            twoPass: false,
+          },
+        ],
+      ]);
+      expect(assetMock.update).toHaveBeenCalledWith({ id: 'asset-id', previewPath, thumbnailPath });
+    });
+
+    it('should tonemap thumbnail for hdr video', async () => {
+      mediaMock.probe.mockResolvedValue(probeStub.videoStreamHDR);
+      assetMock.getByIds.mockResolvedValue([assetStub.video]);
+      const previewPath = `upload/thumbs/user-id/as/se/asset-id-preview.jpeg`;
+      const thumbnailPath = `upload/thumbs/user-id/as/se/asset-id-thumbnail.webp`;
+
+      await sut.handleGenerateThumbnails({ id: assetStub.video.id });
+
+      expect(storageMock.mkdirSync).toHaveBeenCalledWith('upload/thumbs/user-id/as/se');
+      expect(mediaMock.transcode).toHaveBeenCalledWith('/original/path.ext', previewPath, {
+        inputOptions: ['-ss 00:00:00', '-sws_flags accurate_rnd+full_chroma_int'],
+        outputOptions: [
+          '-frames:v 1',
+          '-v verbose',
+          '-vf zscale=t=linear:npl=100,tonemap=hable:desat=0,zscale=p=bt709:t=601:m=bt470bg:range=pc,format=yuv420p',
+        ],
+        twoPass: false,
+      });
+      expect(mediaMock.transcode).toHaveBeenCalledWith('/original/path.ext', thumbnailPath, {
+        inputOptions: ['-ss 00:00:00', '-sws_flags accurate_rnd+full_chroma_int'],
+        outputOptions: [
+          '-frames:v 1',
+          '-v verbose',
+          '-vf scale=-2:250:flags=lanczos+accurate_rnd+full_chroma_int,zscale=t=linear:npl=100,tonemap=hable:desat=0,zscale=p=bt709:t=601:m=bt470bg:range=pc,format=yuv420p',
+        ],
+        twoPass: false,
+      });
+      expect(assetMock.update).toHaveBeenCalledWith({ id: 'asset-id', previewPath, thumbnailPath });
+    });
+
+    it('should always generate video thumbnail in one pass', async () => {
+      mediaMock.probe.mockResolvedValue(probeStub.videoStreamHDR);
+      systemMock.get.mockResolvedValue({
+        ffmpeg: { twoPass: true, maxBitrate: '5000k' },
+      });
+      assetMock.getByIds.mockResolvedValue([assetStub.video]);
+
+      await sut.handleGenerateThumbnails({ id: assetStub.video.id });
+
+      expect(mediaMock.transcode.mock.calls).toEqual([
+        [
+          '/original/path.ext',
+          'upload/thumbs/user-id/as/se/asset-id-preview.jpeg',
+          {
+            inputOptions: ['-ss 00:00:00', '-sws_flags accurate_rnd+full_chroma_int'],
+            outputOptions: [
+              '-frames:v 1',
+              '-v verbose',
+              '-vf zscale=t=linear:npl=100,tonemap=hable:desat=0,zscale=p=bt709:t=601:m=bt470bg:range=pc,format=yuv420p',
+            ],
+            twoPass: false,
+          },
+        ],
+        [
+          '/original/path.ext',
+          'upload/thumbs/user-id/as/se/asset-id-thumbnail.webp',
+          {
+            inputOptions: ['-ss 00:00:00', '-sws_flags accurate_rnd+full_chroma_int'],
+            outputOptions: [
+              '-frames:v 1',
+              '-v verbose',
+              '-vf scale=-2:250:flags=lanczos+accurate_rnd+full_chroma_int,zscale=t=linear:npl=100,tonemap=hable:desat=0,zscale=p=bt709:t=601:m=bt470bg:range=pc,format=yuv420p',
+            ],
+            twoPass: false,
+          },
+        ],
+      ]);
+    });
   });
 
   describe('handleGenerateThumbhash', () => {
