@@ -36,7 +36,7 @@
   <section
     id="memory-lane"
     bind:this={memoryLaneElement}
-    class="relative mt-5 overflow-x-hidden whitespace-nowrap transition-all"
+    class=" mt-5 overflow-x-hidden whitespace-nowrap transition-all"
     bind:offsetWidth
     on:scroll={onScroll}
   >

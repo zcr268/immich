@@ -2,7 +2,7 @@
   import Icon from '$lib/components/elements/icon.svelte';
   import type { AssetInteractionStore } from '$lib/stores/asset-interaction.store';
   import { assetViewingStore } from '$lib/stores/asset-viewing.store';
-  import type { AssetStore, Viewport } from '$lib/stores/assets.store';
+  import { type AssetStore, type Viewport } from '$lib/stores/assets.store';
   import { locale } from '$lib/stores/preferences.store';
   import { getAssetRatio } from '$lib/utils/asset-utils';
   import {
@@ -10,11 +10,12 @@
     formatGroupTitle,
     fromLocalDateTime,
     splitBucketIntoDateGroups,
+    type LayoutBox,
   } from '$lib/utils/timeline-util';
   import type { AssetResponseDto } from '@immich/sdk';
   import { mdiCheckCircle, mdiCircleOutline } from '@mdi/js';
   import justifiedLayout from 'justified-layout';
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
   import { fly } from 'svelte/transition';
   import Thumbnail from '../assets/thumbnail/thumbnail.svelte';
 
@@ -30,6 +31,38 @@
   export let assetStore: AssetStore;
   export let assetInteractionStore: AssetInteractionStore;
 
+  export function findLayoutForAsset(assetId: string) {
+    return assetLayoutMap.get(assetId);
+  }
+  export function findAssetAtTopPosition(top: number) {
+    if (top < 0) return;
+
+    let keys = [...topPositionAssetMap.keys()];
+    let i = 0;
+    for (let i = 0; i < keys.length; i++) {
+      const cur_number = keys[i];
+      const next_number = keys[i + 1] || Infinity;
+      const _assets = topPositionAssetMap.get(cur_number);
+
+      // console.log(cur_number, next_number, 'top', top);
+      if (top >= cur_number && top < next_number) {
+        return _assets;
+      }
+    }
+    return undefined;
+  }
+  onMount(() => {
+    // debugger;
+    // if (scrollToAssetId) {
+    //   const a = assets.find((asset) => asset.id === scrollToAssetId);
+    //   debugger;
+    //   if (a) {
+    //     // const elem = document.querySelector(`[data-thumbnail-asset-id='${a.id}']`);
+    //     // debugger;
+    //     // console.log(elem);
+    //   }
+    // }
+  });
   const { selectedGroup, selectedAssets, assetSelectionCandidates, isMultiSelectState } = assetInteractionStore;
   const dispatch = createEventDispatcher<{
     select: { title: string; assets: AssetResponseDto[] };
@@ -62,7 +95,39 @@
         containerWidth: calculateWidth(justifiedLayoutResult.boxes),
       });
     }
+    // console.log('geo', geometry);
     return geometry;
+  })();
+  $: assetLayoutMap = (() => {
+    const assetGeo = new Map<string, LayoutBox>();
+
+    for (let i = 0; i < assetsGroupByDate.length; i++) {
+      const group = assetsGroupByDate[i];
+      const geo = geometry[i];
+      for (let j = 0; j < group.length; j++) {
+        assetGeo.set(group[j].id, geo.boxes[j]);
+      }
+    }
+    return assetGeo;
+  })();
+  $: topPositionAssetMap = (() => {
+    const topPositionAssetMap = new Map<number, string[]>();
+    for (let i = 0; i < assetsGroupByDate.length; i++) {
+      const group = assetsGroupByDate[i];
+      const geo = geometry[i];
+      const prevHeight = i === 0 ? 0 : geometry[i - 1].containerHeight;
+      for (let j = 0; j < group.length; j++) {
+        const top = geo.boxes[j].top + prevHeight;
+        const assetId = group[j].id;
+        if (topPositionAssetMap.has(top)) {
+          topPositionAssetMap.get(top)!.push(assetId);
+        } else {
+          topPositionAssetMap.set(top, [assetId]);
+        }
+      }
+    }
+    debugger;
+    return topPositionAssetMap;
   })();
 
   $: {
@@ -156,11 +221,13 @@
       >
         {#each groupAssets as asset, index (asset.id)}
           {@const box = geometry[groupIndex].boxes[index]}
+          <!-- {console.log('box', box)} -->
           <div
             class="absolute"
             style="width: {box.width}px; height: {box.height}px; top: {box.top}px; left: {box.left}px"
           >
             <Thumbnail
+              scroll={$assetStore.pendingScrollAssetId === asset.id}
               showStackedIcon={withStacked}
               {showArchiveIcon}
               {asset}
@@ -176,6 +243,7 @@
               }}
               on:select={() => assetSelectHandler(asset, groupAssets, groupTitle)}
               on:mouse-event={() => assetMouseEventHandler(groupTitle, asset)}
+              on:element-scrolled={() => $assetStore.clearPendingScroll()}
               selected={$selectedAssets.has(asset) || $assetStore.albumAssets.has(asset.id)}
               selectionCandidate={$assetSelectionCandidates.has(asset)}
               disabled={$assetStore.albumAssets.has(asset.id)}

@@ -44,6 +44,7 @@
   let element: HTMLElement;
   let showShortcuts = false;
   let showSkeleton = true;
+  let assetGroupCmp: AssetDateGroup[] = [];
 
   $: timelineY = element?.scrollTop || 0;
   $: isEmpty = $assetStore.initialized && $assetStore.buckets.length === 0;
@@ -59,12 +60,36 @@
     void assetStore.updateViewport(viewport);
   }
 
+  $: {
+    // if (scrollToAssetId) {
+    //   const a = $assetStore.assets.indexOf((asset) => asset.id == scrollToAssetId);
+    //   console.log(a);
+    //   debugger;
+    //   for (let i = 0; i < assetGroupCmp.length; i++) {
+    //     const group = assetGroupCmp[i];
+    //     console.log(group);
+    //   }
+    //   for (const group of assetGroupCmp) {
+    //     if (!group) continue;
+    //     const layout = group.findLayoutForAsset(scrollToAssetId);
+    //     debugger;
+    //   }
+    // }
+  }
+
   const dispatch = createEventDispatcher<{ select: AssetResponseDto; escape: void }>();
 
   onMount(async () => {
     showSkeleton = false;
     assetStore.connect();
     await assetStore.init(viewport);
+
+    const _scrollToAssetId = window.location.hash.slice(1);
+    if (_scrollToAssetId) {
+      await assetStore.scrollToAssetId(_scrollToAssetId);
+      // scrollToBucket = await $assetStore.findBucketForAssetId(_scrollToAssetId);
+      // $scrollToAsset = _scrollToAssetId;
+    }
   });
 
   onDestroy(() => {
@@ -433,6 +458,39 @@
   bind:clientWidth={viewport.width}
   bind:this={element}
   on:scroll={handleTimelineScroll}
+  on:scroll={(evt) => {
+    const timeline = document.querySelector('#virtual-timeline');
+    const b = $assetStore.buckets;
+    // console.log('bucket', b);
+    // console.log('groups', assetGroupCmp);
+    const top = -(timeline.getBoundingClientRect().top - 80.5);
+    let prev_bucket_height = 0;
+    let prevOffset = 0;
+    let offset = 0;
+    for (let i = 0; i < b.length; i++) {
+      const cur_bucket_height = b[i].bucketHeight + offset;
+      prevOffset = offset;
+      offset += cur_bucket_height;
+
+      if (top >= prev_bucket_height && top < cur_bucket_height) {
+        debugger;
+        const group = assetGroupCmp[i];
+        if (!group) {
+          // window.location.hash = '';
+          break;
+        }
+        const a = group.findAssetAtTopPosition(top);
+        if (a) {
+          window.location.hash = a[0];
+        } else {
+        }
+      }
+      prev_bucket_height = cur_bucket_height;
+    }
+
+    // debugger;
+    // console.log('scroll!!!', evt);
+  }}
 >
   <!-- skeleton -->
   {#if showSkeleton}
@@ -454,7 +512,7 @@
       <slot name="empty" />
     {/if}
     <section id="virtual-timeline" style:height={$assetStore.timelineHeight + 'px'}>
-      {#each $assetStore.buckets as bucket (bucket.bucketDate)}
+      {#each $assetStore.buckets as bucket, index (bucket.bucketDate)}
         <IntersectionObserver
           on:intersected={intersectedHandler}
           on:hidden={() => assetStore.cancelBucket(bucket)}
@@ -463,9 +521,11 @@
           bottom={750}
           root={element}
         >
+          {@const showGroup = intersecting || bucket === $assetStore.pendingScrollBucket}
           <div id={'bucket_' + bucket.bucketDate} style:height={bucket.bucketHeight + 'px'}>
-            {#if intersecting}
+            {#if showGroup}
               <AssetDateGroup
+                bind:this={assetGroupCmp[index]}
                 {withStacked}
                 {showArchiveIcon}
                 {assetStore}

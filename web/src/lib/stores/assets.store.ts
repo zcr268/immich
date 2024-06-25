@@ -3,7 +3,8 @@ import { fromLocalDateTime } from '$lib/utils/timeline-util';
 import { TimeBucketSize, getTimeBucket, getTimeBuckets, type AssetResponseDto } from '@immich/sdk';
 import { throttle } from 'lodash-es';
 import { DateTime } from 'luxon';
-import { writable, type Unsubscriber } from 'svelte/store';
+import { writable, type Unsubscriber, type Writable } from 'svelte/store';
+import { load } from '../../routes/+page';
 import { handleError } from '../utils/handle-error';
 import { websocketEvents } from './websocket';
 
@@ -38,6 +39,7 @@ export class AssetBucket {
   assets!: AssetResponseDto[];
   cancelToken!: AbortController | null;
   position!: BucketPosition;
+  preventCancel!: boolean;
 }
 
 const isMismatched = (option: boolean | undefined, value: boolean): boolean =>
@@ -81,6 +83,8 @@ export class AssetStore {
   buckets: AssetBucket[] = [];
   assets: AssetResponseDto[] = [];
   albumAssets: Set<string> = new Set();
+  pendingScrollBucket: AssetBucket | undefined;
+  pendingScrollAssetId: string | undefined;
 
   constructor(
     options: AssetStoreOptions,
@@ -240,6 +244,7 @@ export class AssetStore {
   async loadBucket(bucketDate: string, position: BucketPosition): Promise<void> {
     const bucket = this.getBucketByDate(bucketDate);
     if (!bucket) {
+      debugger;
       return;
     }
 
@@ -279,6 +284,7 @@ export class AssetStore {
       }
 
       if (bucket.cancelToken.signal.aborted) {
+        debugger;
         return;
       }
 
@@ -293,6 +299,10 @@ export class AssetStore {
   }
 
   cancelBucket(bucket: AssetBucket) {
+    if (bucket.preventCancel) {
+      return;
+    }
+    console.log('CANCEL!!', bucket.bucketDate);
     bucket.cancelToken?.abort();
   }
 
@@ -390,7 +400,55 @@ export class AssetStore {
     return this.buckets.find((bucket) => bucket.bucketDate === bucketDate) || null;
   }
 
-  async getBucketInfoForAssetId({ id, localDateTime }: Pick<AssetResponseDto, 'id' | 'localDateTime'>) {
+  async findBucketForAssetId(id: string) {
+    const bucketInfo = this.assetToBucket[id];
+    if (bucketInfo) {
+      return bucketInfo.bucket;
+    }
+    for (const bucket of this.buckets) {
+      if (bucket.assets.length === 0) {
+        bucket.preventCancel = true;
+        await this.loadBucket(bucket.bucketDate, BucketPosition.Unknown);
+      }
+      const bucketInfo = this.assetToBucket[id];
+      if (bucketInfo) {
+        return bucketInfo.bucket;
+      }
+    }
+  }
+
+  async scrollToAssetId(id: string) {
+    const bucket = await this.findBucketForAssetId(id);
+    if (bucket) {
+      this.pendingScrollBucket = bucket;
+      this.pendingScrollAssetId = id;
+      console.log('set id');
+      this.emit(false);
+    } else {
+      // const unsub = this.subscribe(async () => {
+      //   const bucketInfo = this.assetToBucket[id];
+      //   if (bucketInfo) {
+      //     debugger;
+      //     this.pendingScrollBucket = bucketInfo.bucket;
+      //     this.pendingScrollAssetId = id;
+      //     console.log('set id deffered');
+      //     unsub();
+      //     this.emit(false);
+      //   } else {
+      //     console.log('miss');
+      //   }
+      // });
+      // // debugger;
+      // console.log('BADD!');
+    }
+  }
+
+  clearPendingScroll() {
+    this.pendingScrollBucket = undefined;
+    this.pendingScrollAssetId = undefined;
+  }
+
+  private async getBucketInfoForAsset({ id, localDateTime }: Pick<AssetResponseDto, 'id' | 'localDateTime'>) {
     const bucketInfo = this.assetToBucket[id];
     if (bucketInfo) {
       return bucketInfo;
@@ -473,7 +531,7 @@ export class AssetStore {
   }
 
   async getPreviousAsset(asset: AssetResponseDto): Promise<AssetResponseDto | null> {
-    const info = await this.getBucketInfoForAssetId(asset);
+    const info = await this.getBucketInfoForAsset(asset);
     if (!info) {
       return null;
     }
@@ -494,7 +552,7 @@ export class AssetStore {
   }
 
   async getNextAsset(asset: AssetResponseDto): Promise<AssetResponseDto | null> {
-    const info = await this.getBucketInfoForAssetId(asset);
+    const info = await this.getBucketInfoForAsset(asset);
     if (!info) {
       return null;
     }

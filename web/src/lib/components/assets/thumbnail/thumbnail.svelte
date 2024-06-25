@@ -18,7 +18,7 @@
     mdiMotionPlayOutline,
     mdiRotate360,
   } from '@mdi/js';
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
   import { fade } from 'svelte/transition';
   import ImageThumbnail from './image-thumbnail.svelte';
   import VideoThumbnail from './video-thumbnail.svelte';
@@ -27,6 +27,7 @@
   const dispatch = createEventDispatcher<{
     select: { asset: AssetResponseDto };
     'mouse-event': { isMouseOver: boolean; selectedGroupIndex: number };
+    'element-scrolled': { asset: AssetResponseDto };
   }>();
 
   export let asset: AssetResponseDto;
@@ -41,12 +42,24 @@
   export let showArchiveIcon = false;
   export let showStackedIcon = true;
   export let onClick: ((asset: AssetResponseDto, event: Event) => void) | undefined = undefined;
+  export let scroll = false;
 
+  export let thumbnailElement: HTMLElement | undefined = undefined;
   let className = '';
   export { className as class };
 
   let mouseOver = false;
 
+  $: {
+    if (scroll) {
+      // debugger;
+      if (thumbnailElement) {
+        thumbnailElement.getBoundingClientRect();
+        thumbnailElement.scrollIntoView();
+        dispatch('element-scrolled', { asset });
+      }
+    }
+  }
   $: dispatch('mouse-event', { isMouseOver: mouseOver, selectedGroupIndex: groupIndex });
 
   $: [width, height] = ((): [number, number] => {
@@ -61,6 +74,19 @@
     return [235, 235];
   })();
 
+  $: {
+  }
+
+  onMount(() => {
+    // if (scroll) {
+    //   console.log('Trying to scroll');
+    //   if (!element) {
+    //     console.log('BAD!');
+    //   }
+    //   console.log(element.getBoundingClientRect());
+    //   element.scrollIntoView();
+    // }
+  });
   const onIconClickedHandler = (e: MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
@@ -93,6 +119,7 @@
 
 <IntersectionObserver once={false} on:intersected let:intersecting>
   <a
+    bind:this={thumbnailElement}
     href={currentUrlReplaceAssetId(asset.id)}
     style:width="{width}px"
     style:height="{height}px"
