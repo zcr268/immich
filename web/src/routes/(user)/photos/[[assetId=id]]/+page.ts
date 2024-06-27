@@ -7,8 +7,8 @@ import type { PageLoad } from './$types';
 export const load = (async ({ params }) => {
   await authenticate();
   const asset = await getAssetInfoFromParam(params);
-
   const $t = get(t);
+
   return {
     asset,
     meta: {

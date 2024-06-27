@@ -8,7 +8,6 @@
   export let left = 0;
   export let right = 0;
   export let root: HTMLElement | null = null;
-  export let disabled = false;
 
   export let intersecting = false;
   let container: HTMLDivElement;
@@ -21,10 +20,6 @@
   }>();
 
   onMount(() => {
-    if (disabled) {
-      console.log('disabled');
-      return;
-    }
     if (typeof IntersectionObserver !== 'undefined') {
       const rootMargin = `${top}px ${right}px ${bottom}px ${left}px`;
       const observer = new IntersectionObserver(

@@ -27,7 +27,6 @@
   const dispatch = createEventDispatcher<{
     select: { asset: AssetResponseDto };
     'mouse-event': { isMouseOver: boolean; selectedGroupIndex: number };
-    'element-scrolled': { asset: AssetResponseDto };
   }>();
 
   export let asset: AssetResponseDto;

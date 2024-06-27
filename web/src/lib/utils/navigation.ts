@@ -93,9 +93,6 @@ async function navigateAssetGridRoute(route: AssetGridRoute) {
   const { assetId, assetGridScrollTarget } = route;
   const assetUrl = assetId ? currentUrlReplaceAssetId(assetId) : currentUrlWithoutAsset();
   const next = replaceScrollTarget(assetUrl, assetGridScrollTarget);
-  // const next = assetGridScrollTarget
-  //   ? currentUrlReplaceReplaceScrollTarget(assetGridScrollTarget)
-  //   : currentUrlWithoutAsset();
   if (next !== currentUrl()) {
     await goto(next, { replaceState: true, noScroll: true, keepFocus: true });
   }

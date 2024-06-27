@@ -92,7 +92,7 @@
 
   let geometry: GeometryType[] = [];
 
-  let handle = (thumbnailElement: HTMLElement) => {
+  let scrollToThumbnail = (thumbnailElement: HTMLElement) => {
     const thumbBox = thumbnailElement?.offsetParent as HTMLElement;
     const imageGrid = thumbBox.offsetParent as HTMLElement;
     const section = imageGrid.offsetParent as HTMLElement;
@@ -244,7 +244,6 @@
       >
         {#each groupAssets as asset, index (asset.id)}
           {@const box = geometry[groupIndex].boxes[index]}
-          <!-- {console.log('box', box)} -->
           <div
             class="absolute"
             style="width: {box.width}px; height: {box.height}px; top: {box.top}px; left: {box.left}px"
@@ -255,7 +254,7 @@
               {showArchiveIcon}
               {asset}
               {groupIndex}
-              onScrollTargetElementAdded={handle}
+              onScrollTargetElementAdded={scrollToThumbnail}
               onClick={(asset, event) => {
                 if (isSelectionMode || $isMultiSelectState) {
                   event.preventDefault();
@@ -267,7 +266,6 @@
               }}
               on:select={() => assetSelectHandler(asset, groupAssets, groupTitle)}
               on:mouse-event={() => assetMouseEventHandler(groupTitle, asset)}
-              on:element-scrolled={() => $assetStore.clearPendingScroll()}
               selected={$selectedAssets.has(asset) || $assetStore.albumAssets.has(asset.id)}
               selectionCandidate={$assetSelectionCandidates.has(asset)}
               disabled={$assetStore.albumAssets.has(asset.id)}
