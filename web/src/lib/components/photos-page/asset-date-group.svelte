@@ -66,7 +66,7 @@
       const next_number = i === geometry.length - 1 ? bucketHeight : geometry[i + 1].topOffset;
 
       if (top >= cur_number && top < next_number) {
-        return findLeftMost(geo, top);
+        return findLeftMost(geo, top - i * 51);
       }
     }
   }
