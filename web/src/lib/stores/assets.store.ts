@@ -1,6 +1,6 @@
 import { getKey } from '$lib/utils';
 import { fromLocalDateTime } from '$lib/utils/timeline-util';
-import { TimeBucketSize, getTimeBucket, getTimeBuckets, type AssetResponseDto } from '@immich/sdk';
+import { TimeBucketSize, getAssetInfo, getTimeBucket, getTimeBuckets, type AssetResponseDto } from '@immich/sdk';
 import { throttle } from 'lodash-es';
 import { DateTime } from 'luxon';
 import { writable, type Unsubscriber } from 'svelte/store';
@@ -240,7 +240,7 @@ export class AssetStore {
     this.emit(false);
   }
 
-  async loadBucket(bucketDate: string, position: BucketPosition): Promise<void> {
+  async loadBucket(bucketDate: string, position: BucketPosition, preventCancel: boolean): Promise<void> {
     const bucket = this.getBucketByDate(bucketDate);
     if (!bucket) {
       return;
@@ -254,6 +254,10 @@ export class AssetStore {
     if (bucket.cancelToken || bucket.assets.length > 0) {
       this.emit(false);
       return;
+    }
+
+    if (preventCancel) {
+      bucket.preventCancel = true;
     }
 
     bucket.cancelToken = new AbortController();
@@ -405,14 +409,11 @@ export class AssetStore {
     if (bucketInfo) {
       return bucketInfo.bucket;
     }
-    for (const bucket of this.buckets) {
-      if (bucket.assets.length === 0) {
-        bucket.preventCancel = true;
-        await this.loadBucket(bucket.bucketDate, BucketPosition.Unknown);
-      }
-      const bucketInfo = this.assetToBucket[id];
-      if (bucketInfo) {
-        return bucketInfo.bucket;
+    const asset = await getAssetInfo({ id });
+    if (asset) {
+      const info = await this.getBucketInfoForAsset(asset, true);
+      if (info) {
+        return info.bucket;
       }
     }
   }
@@ -435,7 +436,10 @@ export class AssetStore {
     this.pendingScrollAssetId = undefined;
   }
 
-  private async getBucketInfoForAsset({ id, localDateTime }: Pick<AssetResponseDto, 'id' | 'localDateTime'>) {
+  private async getBucketInfoForAsset(
+    { id, localDateTime }: Pick<AssetResponseDto, 'id' | 'localDateTime'>,
+    preventCancel?: boolean,
+  ) {
     const bucketInfo = this.assetToBucket[id];
     if (bucketInfo) {
       return bucketInfo;
@@ -446,7 +450,7 @@ export class AssetStore {
     } else if (this.options.size == TimeBucketSize.Day) {
       date = date.set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
     }
-    await this.loadBucket(date.toISO()!, BucketPosition.Unknown);
+    await this.loadBucket(date.toISO()!, BucketPosition.Unknown, preventCancel);
     return this.assetToBucket[id] || null;
   }
 
