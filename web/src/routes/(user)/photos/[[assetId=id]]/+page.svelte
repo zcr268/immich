@@ -24,8 +24,9 @@
   import { mdiDotsVertical, mdiPlus } from '@mdi/js';
   import { preferences, user } from '$lib/stores/user.store';
   import { t } from 'svelte-i18n';
+  import { page } from '$app/stores';
 
-  let { isViewing: showAssetViewer } = assetViewingStore;
+  let { isViewing: showAssetViewer, setGridScrollTarget } = assetViewingStore;
   const assetStore = new AssetStore({ isArchived: false, withStacked: true, withPartners: true });
   const assetInteractionStore = createAssetInteractionStore();
   const { isMultiSelectState, selectedAssets } = assetInteractionStore;
@@ -48,6 +49,12 @@
       return;
     }
   };
+
+  $: {
+    if ($page.url.hash) {
+      setGridScrollTarget($page.url.hash.slice(1));
+    }
+  }
 </script>
 
 {#if $isMultiSelectState}

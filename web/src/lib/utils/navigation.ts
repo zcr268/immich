@@ -40,10 +40,18 @@ export function currentUrlReplaceAssetId(assetId: string) {
     : `${$page.url.pathname.replace(/(\/photos.*)$/, '')}/photos/${assetId}${$page.url.search}`;
 }
 
+export function currentUrlReplaceReplaceScrollTarget(assetGridScrollTarget: string | null) {
+  const $page = get(page);
+  if (assetGridScrollTarget === null) {
+    return $page.url.pathname;
+  }
+  return $page.url.pathname + '#' + assetGridScrollTarget;
+}
+
 function currentUrl() {
   const $page = get(page);
   const current = $page.url;
-  return current.pathname + current.search;
+  return current.pathname + current.search + current.hash;
 }
 
 interface Route {
@@ -55,11 +63,21 @@ interface Route {
 
 interface AssetRoute extends Route {
   targetRoute: 'current';
-  assetId: string | null;
+  assetId: string | null | undefined;
 }
+interface AssetGridRoute extends Route {
+  targetRoute: 'current';
+  assetGridScrollTarget: string | null | undefined;
+}
+
+type ImmichRoute = AssetRoute | AssetGridRoute;
 
 function isAssetRoute(route: Route): route is AssetRoute {
   return route.targetRoute === 'current' && 'assetId' in route;
+}
+
+function isAssetGridRoute(route: Route): route is AssetGridRoute {
+  return route.targetRoute === 'current' && 'assetGridScrollTarget' in route;
 }
 
 async function navigateAssetRoute(route: AssetRoute) {
@@ -70,9 +88,21 @@ async function navigateAssetRoute(route: AssetRoute) {
   }
 }
 
-export function navigate<T extends Route>(change: T): Promise<void> {
+async function navigateAssetGridRoute(route: AssetGridRoute) {
+  const { assetGridScrollTarget } = route;
+  const next = assetGridScrollTarget
+    ? currentUrlReplaceReplaceScrollTarget(assetGridScrollTarget)
+    : currentUrlWithoutAsset();
+  if (next !== currentUrl()) {
+    await goto(next, { replaceState: true, noScroll: true, keepFocus: true });
+  }
+}
+
+export function navigate(change: ImmichRoute): Promise<void> {
   if (isAssetRoute(change)) {
     return navigateAssetRoute(change);
+  } else if (isAssetGridRoute(change)) {
+    return navigateAssetGridRoute(change);
   }
   // future navigation requests here
   throw `Invalid navigation: ${JSON.stringify(change)}`;

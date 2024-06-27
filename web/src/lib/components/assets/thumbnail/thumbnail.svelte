@@ -42,23 +42,37 @@
   export let showArchiveIcon = false;
   export let showStackedIcon = true;
   export let onClick: ((asset: AssetResponseDto, event: Event) => void) | undefined = undefined;
+  export let onScrollTargetElementAdded: ((scrollTargetElement: HTMLElement) => void) | undefined = undefined;
   export let scroll = false;
 
   export let thumbnailElement: HTMLElement | undefined = undefined;
   let className = '';
   export { className as class };
+  export let scrollTargetElement: HTMLElement | undefined = undefined;
 
   let mouseOver = false;
 
   $: {
     if (scroll) {
-      // debugger;
       if (thumbnailElement) {
-        thumbnailElement.getBoundingClientRect();
-        thumbnailElement.scrollIntoView();
-        dispatch('element-scrolled', { asset });
+        // debugger;
+        // scrollTargetElement = thumbnailElement;
+        onScrollTargetElementAdded?.(thumbnailElement);
       }
+    } else {
+      scrollTargetElement = undefined;
     }
+  }
+  $: {
+    // if (scroll) {
+    //   // debugger;
+    //   if (thumbnailElement) {
+    //     thumbnailElement.getBoundingClientRect();
+    //     debugger;
+    //     thumbnailElement.scrollIntoView();
+    //     dispatch('element-scrolled', { asset });
+    //   }
+    // }
   }
   $: dispatch('mouse-event', { isMouseOver: mouseOver, selectedGroupIndex: groupIndex });
 
@@ -78,6 +92,9 @@
   }
 
   onMount(() => {
+    if ('f06bfdb1-b004-4869-a720-8c380b6e8d21' === asset.id) {
+      console.log(asset.id);
+    }
     // if (scroll) {
     //   console.log('Trying to scroll');
     //   if (!element) {

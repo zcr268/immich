@@ -219,6 +219,7 @@ export class AssetStore {
   }
 
   async updateViewport(viewport: Viewport) {
+    debugger;
     for (const bucket of this.buckets) {
       const unwrappedWidth = (3 / 2) * bucket.bucketCount * THUMBNAIL_HEIGHT * (7 / 10);
       const rows = Math.ceil(unwrappedWidth / viewport.width);
@@ -244,15 +245,23 @@ export class AssetStore {
   async loadBucket(bucketDate: string, position: BucketPosition): Promise<void> {
     const bucket = this.getBucketByDate(bucketDate);
     if (!bucket) {
-      debugger;
       return;
     }
+    console.log('load bucket', bucketDate);
 
-    bucket.position = position;
+    if (!(bucket.position === BucketPosition.Above && position === BucketPosition.Visible)) {
+      bucket.position = position;
+    }
 
     if (bucket.cancelToken || bucket.assets.length > 0) {
       this.emit(false);
+      if (position === BucketPosition.Visible) {
+        debugger;
+      }
       return;
+    }
+    if (position === BucketPosition.Visible) {
+      debugger;
     }
 
     bucket.cancelToken = new AbortController();
@@ -302,16 +311,22 @@ export class AssetStore {
     if (bucket.preventCancel) {
       return;
     }
+    bucket.position = BucketPosition.Unknown;
     console.log('CANCEL!!', bucket.bucketDate);
     bucket.cancelToken?.abort();
   }
 
   updateBucket(bucketDate: string, height: number) {
+    console.log('update bucket', bucketDate, height);
+
     const bucket = this.getBucketByDate(bucketDate);
     if (!bucket) {
       return 0;
     }
-
+    // if (bucketDate === '2008-05-01T00:00:00.000Z') {
+    //   debugger;
+    //   bucket.position = BucketPosition.Above;
+    // }
     const delta = height - bucket.bucketHeight;
     const scrollTimeline = bucket.position == BucketPosition.Above;
 
@@ -417,7 +432,9 @@ export class AssetStore {
     }
   }
 
-  async scrollToAssetId(id: string) {
+  async scrollToAssetId(id?: string) {
+    if (!id) return;
+
     const bucket = await this.findBucketForAssetId(id);
     if (bucket) {
       this.pendingScrollBucket = bucket;
