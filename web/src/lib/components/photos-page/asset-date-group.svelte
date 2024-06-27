@@ -18,7 +18,6 @@
   import { createEventDispatcher, onMount, tick } from 'svelte';
   import { fly } from 'svelte/transition';
   import Thumbnail from '../assets/thumbnail/thumbnail.svelte';
-  import { once } from '$lib/utils/once';
 
   export let element: HTMLElement | undefined = undefined;
   export let assets: AssetResponseDto[];
@@ -33,14 +32,10 @@
   export let assetStore: AssetStore;
   export let assetInteractionStore: AssetInteractionStore;
 
-  export let scrollTargetElement: HTMLElement | undefined = undefined;
-
   function nextRowIndex(geometry: GeometryType, start: number) {
     const offsetIndex = geometry.boxes.slice(start).findIndex((box) => box.left === 0);
     return offsetIndex === -1 ? -1 : offsetIndex + start;
   }
-
-  let doneit = false;
 
   function findLeftMost(geometry: GeometryType, top: number) {
     // note: every boxes.left === 0 indicates start of new row
@@ -50,9 +45,8 @@
       const rowTop = geometry.boxes[j].top + geoTopOffset;
       const nextRow = nextRowIndex(geometry, j + 1);
       const nextRowTop = (nextRow === -1 ? geometry.containerHeight : geometry.boxes[nextRow].top) + geoTopOffset;
-      debugger;
       if (top >= rowTop && top < nextRowTop) {
-        return [geometry.assets[j]];
+        return geometry.assets[j];
       }
       rowTopOffset += nextRowTop;
       if (nextRow === -1) break;
@@ -73,18 +67,7 @@
       }
     }
   }
-  onMount(() => {
-    // debugger;
-    // if (scrollToAssetId) {
-    //   const a = assets.find((asset) => asset.id === scrollToAssetId);
-    //   debugger;
-    //   if (a) {
-    //     // const elem = document.querySelector(`[data-thumbnail-asset-id='${a.id}']`);
-    //     // debugger;
-    //     // console.log(elem);
-    //   }
-    // }
-  });
+
   const { selectedGroup, selectedAssets, assetSelectionCandidates, isMultiSelectState } = assetInteractionStore;
   const dispatch = createEventDispatcher<{
     select: { title: string; assets: AssetResponseDto[] };
@@ -106,62 +89,31 @@
 
   let geometry: GeometryType[] = [];
 
-  let handle = (thumbnailElement) => {
-    debugger;
-    console.log('ADDED');
+  let handle = (thumbnailElement: HTMLElement) => {
+    const thumbBox = thumbnailElement?.offsetParent as HTMLElement;
+    const imageGrid = thumbBox.offsetParent as HTMLElement;
+    const section = imageGrid.offsetParent as HTMLElement;
+    const sectionTitle = imageGrid.previousElementSibling as HTMLElement;
 
-    try {
-      const thumbBox = thumbnailElement?.offsetParent;
-      // @ts-ignore:
-      const imageGrid = thumbBox.offsetParent;
-      const section = imageGrid.offsetParent;
-      const sectionTitle = imageGrid.previousElementSibling;
-      // @ts-ignore:
-      const offsetFromImageGrid = thumbBox.offsetTop;
-      // add height of all previous imageGrid
-      // let previousDateGroupHeight = 0;
-      // const dateGroupElement = thumbnailElement?.offsetParent?.offsetParent?.parentElement;
-      // let previousGroup = dateGroupElement.previousGroup;
-      // while (previousGroup) {
-      //   previousDateGroupHeight += previousGroup.getBoundingClientRect().height;
-      //   previousGroup = previousGroup.previousElementSibling;
-      // }
-      // @ts-ignore:
-      const previousSections = imageGrid.offsetTop;
-      const headerSize =
-        // @ts-ignore:
-        sectionTitle.getBoundingClientRect().height;
+    const offsetFromImageGrid = thumbBox.offsetTop;
+    const previousSections = imageGrid.offsetTop;
+    const headerSize = sectionTitle.getBoundingClientRect().height;
 
-      // const b =
-      //   // @ts-ignore:
-      //   thumbnailElement?.offsetParent?.offsetParent?.parentElement?.previousSibling.getBoundingClientRect();
-      // @ts-ignore:
-      const c = section.offsetTop;
-      console.log(offsetFromImageGrid, previousSections, c);
-      const tot = offsetFromImageGrid + previousSections + c - headerSize;
-      console.log('tot', tot);
-      debugger;
+    const sectionOffset = section.offsetTop;
+    const offset = offsetFromImageGrid + previousSections + sectionOffset - headerSize;
 
-      const buckets = $assetStore.buckets;
+    const buckets = $assetStore.buckets;
 
-      for (let i = 0; i < buckets.length; i++) {
-        const b = buckets[i];
-        // console.log(b);
-        if (b.bucketDate === section.dataset.bucketDate) {
-          break;
-        }
-        b.position = BucketPosition.Above;
-        // if (b. section.dataset.bucketDate
+    for (const bucket of buckets) {
+      if (bucket.bucketDate === section.dataset.bucketDate) {
+        break;
       }
-
-      document.querySelector('#asset-grid')?.scrollTo({ top: tot });
-
-      $assetStore.clearPendingScroll();
-    } catch (e) {
-      debugger;
-      console.log('error!', e);
+      bucket.position = BucketPosition.Above;
     }
-    // debugger;
+
+    document.querySelector('#asset-grid')?.scrollTo({ top: offset });
+
+    $assetStore.clearPendingScroll();
   };
 
   $: {
@@ -191,34 +143,10 @@
     }
   }
 
-  // $: topPositionAssetMap = (() => {
-  //   debugger;
-  //   const topPositionAssetMap = new Map<number, string[]>();
-  //   let prev_group_height = 0;
-  //   for (let i = 0; i < assetsGroupByDate.length; i++) {
-  //     const group = assetsGroupByDate[i];
-  //     const geo = geometry[i];
-  //     for (let j = 0; j < group.length; j++) {
-  //       const top = geo.boxes[j].top + prev_group_height;
-  //       const assetId = group[j].id;
-  //       if (topPositionAssetMap.has(top)) {
-  //         topPositionAssetMap.get(top)!.push(assetId);
-  //       } else {
-  //         topPositionAssetMap.set(top, [assetId]);
-  //       }
-  //     }
-  //     prev_group_height += geometry[i].containerHeight;
-  //   }
-  //   return topPositionAssetMap;
-  // })();
-
   $: {
     if (actualBucketHeight && actualBucketHeight !== 0 && actualBucketHeight != bucketHeight) {
-      console.log('Update actual bucket');
       const heightDelta = assetStore.updateBucket(bucketDate, actualBucketHeight);
-      console.log('d', heightDelta);
       if (heightDelta !== 0) {
-        // setTimeout(() => scrollTimeline(heightDelta), 100);
         tick().then(() => scrollTimeline(heightDelta));
       }
     }
@@ -319,8 +247,7 @@
             style="width: {box.width}px; height: {box.height}px; top: {box.top}px; left: {box.left}px"
           >
             <Thumbnail
-              scroll={$assetStore.pendingScrollAssetId === asset.id}
-              bind:scrollTargetElement
+              scrollTarget={$assetStore.pendingScrollAssetId === asset.id}
               showStackedIcon={withStacked}
               {showArchiveIcon}
               {asset}

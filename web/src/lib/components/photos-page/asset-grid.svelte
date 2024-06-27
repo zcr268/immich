@@ -12,7 +12,7 @@
   import { formatGroupTitle, splitBucketIntoDateGroups } from '$lib/utils/timeline-util';
   import type { AlbumResponseDto, AssetResponseDto } from '@immich/sdk';
   import { DateTime } from 'luxon';
-  import { createEventDispatcher, onDestroy, onMount } from 'svelte';
+  import { createEventDispatcher, onDestroy, onMount, tick } from 'svelte';
   import IntersectionObserver from '../asset-viewer/intersection-observer.svelte';
   import Portal from '../shared-components/portal/portal.svelte';
   import Scrollbar from '../shared-components/scrollbar/scrollbar.svelte';
@@ -56,8 +56,6 @@
   let assetGroupCmp: AssetDateGroup[] = [];
   let assetGroupElem: HTMLElement[] = [];
 
-  let scrollTargetElement: HTMLElement;
-
   $: timelineY = element?.scrollTop || 0;
   $: isEmpty = $assetStore.initialized && $assetStore.buckets.length === 0;
   $: idsSelectedAssets = [...$selectedAssets].map(({ id }) => id);
@@ -69,33 +67,7 @@
   }
 
   $: {
-    // if (scrollTargetElement) {
-    //   // debugger;
-    //   element.scrollTo({ top: scrollTargetElement.offsetTop });
-    // }
-    // console.log(scrollTargetElement);
-    // debugger;
-  }
-
-  $: {
     void assetStore.updateViewport(viewport);
-  }
-
-  $: {
-    // if (scrollToAssetId) {
-    //   const a = $assetStore.assets.indexOf((asset) => asset.id == scrollToAssetId);
-    //   console.log(a);
-    //   debugger;
-    //   for (let i = 0; i < assetGroupCmp.length; i++) {
-    //     const group = assetGroupCmp[i];
-    //     console.log(group);
-    //   }
-    //   for (const group of assetGroupCmp) {
-    //     if (!group) continue;
-    //     const layout = group.findLayoutForAsset(scrollToAssetId);
-    //     debugger;
-    //   }
-    // }
   }
 
   const dispatch = createEventDispatcher<{ select: AssetResponseDto; escape: void }>();
@@ -119,7 +91,6 @@
   const updateScrollTarget = () => {
     const buckets = $assetStore.buckets;
     const top = -(timelineElement.getBoundingClientRect().top - 80.5);
-    // console.log(top);
     let prev_bucket_height = 0;
     for (let i = 0; i < buckets.length; i++) {
       const cur_bucket_height = prev_bucket_height + buckets[i].bucketHeight;
@@ -128,10 +99,9 @@
         if (!group) {
           break;
         }
-
-        const a = group.findAssetAtTopLeftPosition(top - prev_bucket_height);
-        if (a) {
-          setGridScrollTarget(a[0].id);
+        const asset = group.findAssetAtTopLeftPosition(top - prev_bucket_height);
+        if (asset) {
+          setGridScrollTarget(asset.id);
         }
       }
       prev_bucket_height = cur_bucket_height;
@@ -256,8 +226,12 @@
     return !!nextAsset;
   };
 
-  const handleClose = () => {
+  const handleClose = async () => {
     assetViewingStore.showAssetViewer(false);
+    debugger;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    updateScrollTarget();
   };
 
   const handleAction = async (action: AssetAction, asset: AssetResponseDto) => {
@@ -524,10 +498,7 @@
       {#each $assetStore.buckets as bucket, index (bucket.bucketDate)}
         <IntersectionObserver
           on:intersected={intersectedHandler}
-          on:hidden={() => {
-            // console.log('hide', bucket);
-            assetStore.cancelBucket(bucket);
-          }}
+          on:hidden={() => assetStore.cancelBucket(bucket)}
           let:intersecting
           top={750}
           bottom={750}
@@ -539,7 +510,6 @@
               <AssetDateGroup
                 bind:this={assetGroupCmp[index]}
                 bind:element={assetGroupElem[index]}
-                bind:scrollTargetElement
                 {withStacked}
                 {showArchiveIcon}
                 {assetStore}
@@ -555,6 +525,8 @@
                 bucketHeight={bucket.bucketHeight}
                 {viewport}
               />
+            {:else}
+              <p>not</p>
             {/if}
           </div>
         </IntersectionObserver>
