@@ -24,9 +24,9 @@ function createAssetViewingStore() {
     viewState.set(show);
   };
 
-  const setGridScrollTarget = (assetGridScrollTarget: string) => {
+  const setGridScrollTarget = async (assetGridScrollTarget: string) => {
     scrollTarget.set(assetGridScrollTarget);
-    navigate({ targetRoute: 'current', assetGridScrollTarget });
+    await navigate({ targetRoute: 'current', assetGridScrollTarget });
   };
 
   return {

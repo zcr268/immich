@@ -10,14 +10,14 @@
     formatGroupTitle,
     fromLocalDateTime,
     splitBucketIntoDateGroups,
-    type LayoutBox,
   } from '$lib/utils/timeline-util';
   import type { AssetResponseDto } from '@immich/sdk';
   import { mdiCheckCircle, mdiCircleOutline } from '@mdi/js';
   import justifiedLayout from 'justified-layout';
-  import { createEventDispatcher, onMount, tick } from 'svelte';
+  import { createEventDispatcher, tick } from 'svelte';
   import { fly } from 'svelte/transition';
   import Thumbnail from '../assets/thumbnail/thumbnail.svelte';
+  import { handlePromiseError } from '$lib/utils';
 
   export let element: HTMLElement | undefined = undefined;
   export let assets: AssetResponseDto[];
@@ -40,7 +40,7 @@
   function findLeftMost(geometry: GeometryType, top: number) {
     // note: every boxes.left === 0 indicates start of new row
     const { topOffset: geoTopOffset } = geometry;
-    let rowTopOffset = 0;
+
     for (let j = 0; j < geometry.boxes.length; ) {
       const rowTop = geometry.boxes[j].top + geoTopOffset;
       const nextRow = nextRowIndex(geometry, j + 1);
@@ -48,15 +48,18 @@
       if (top >= rowTop && top < nextRowTop) {
         return geometry.assets[j];
       }
-      rowTopOffset += nextRowTop;
-      if (nextRow === -1) break;
+
+      if (nextRow === -1) {
+        break;
+      }
       j = nextRow;
     }
   }
   export function findAssetAtTopLeftPosition(top: number) {
-    if (top < 0) return;
+    if (top < 0) {
+      return;
+    }
 
-    let i = 0;
     for (let i = 0; i < geometry.length; i++) {
       const geo = geometry[i];
       const cur_number = geo.topOffset;
@@ -147,7 +150,7 @@
     if (actualBucketHeight && actualBucketHeight !== 0 && actualBucketHeight != bucketHeight) {
       const heightDelta = assetStore.updateBucket(bucketDate, actualBucketHeight);
       if (heightDelta !== 0) {
-        tick().then(() => scrollTimeline(heightDelta));
+        handlePromiseError(tick().then(() => scrollTimeline(heightDelta)));
       }
     }
   }

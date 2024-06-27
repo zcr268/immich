@@ -3,8 +3,7 @@ import { fromLocalDateTime } from '$lib/utils/timeline-util';
 import { TimeBucketSize, getTimeBucket, getTimeBuckets, type AssetResponseDto } from '@immich/sdk';
 import { throttle } from 'lodash-es';
 import { DateTime } from 'luxon';
-import { writable, type Unsubscriber, type Writable } from 'svelte/store';
-import { load } from '../../routes/+page';
+import { writable, type Unsubscriber } from 'svelte/store';
 import { handleError } from '../utils/handle-error';
 import { websocketEvents } from './websocket';
 
@@ -243,7 +242,9 @@ export class AssetStore {
 
   async loadBucket(bucketDate: string, position: BucketPosition): Promise<void> {
     const bucket = this.getBucketByDate(bucketDate);
-    if (!bucket) return;
+    if (!bucket) {
+      return;
+    }
 
     // disable transition from above to visible, as Above implies visible
     if (!(bucket.position === BucketPosition.Above && position === BucketPosition.Visible)) {
@@ -283,7 +284,9 @@ export class AssetStore {
         }
       }
 
-      if (bucket.cancelToken.signal.aborted) return;
+      if (bucket.cancelToken.signal.aborted) {
+        return;
+      }
 
       bucket.assets = assets;
 
@@ -415,7 +418,9 @@ export class AssetStore {
   }
 
   async scrollToAssetId(id?: string) {
-    if (!id) return;
+    if (!id) {
+      return;
+    }
 
     const bucket = await this.findBucketForAssetId(id);
     if (bucket) {

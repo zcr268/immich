@@ -25,6 +25,7 @@
   import { preferences, user } from '$lib/stores/user.store';
   import { t } from 'svelte-i18n';
   import { page } from '$app/stores';
+  import { handlePromiseError } from '$lib/utils';
 
   let { isViewing: showAssetViewer, setGridScrollTarget } = assetViewingStore;
   const assetStore = new AssetStore({ isArchived: false, withStacked: true, withPartners: true });
@@ -52,7 +53,7 @@
 
   $: {
     if ($page.url.hash) {
-      setGridScrollTarget($page.url.hash.slice(1));
+      handlePromiseError(setGridScrollTarget($page.url.hash.slice(1)));
     }
   }
 </script>

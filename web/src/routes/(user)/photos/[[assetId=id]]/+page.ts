@@ -4,7 +4,7 @@ import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
 import type { PageLoad } from './$types';
 
-export const load = (async ({ url, params }) => {
+export const load = (async ({ params }) => {
   await authenticate();
   const asset = await getAssetInfoFromParam(params);
 

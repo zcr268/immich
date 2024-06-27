@@ -18,7 +18,7 @@
     mdiMotionPlayOutline,
     mdiRotate360,
   } from '@mdi/js';
-  import { createEventDispatcher, onMount } from 'svelte';
+  import { createEventDispatcher } from 'svelte';
   import { fade } from 'svelte/transition';
   import ImageThumbnail from './image-thumbnail.svelte';
   import VideoThumbnail from './video-thumbnail.svelte';
@@ -53,10 +53,8 @@
   let mouseOver = false;
 
   $: {
-    if (scrollTarget) {
-      if (thumbnailElement) {
-        onScrollTargetElementAdded?.(thumbnailElement);
-      }
+    if (scrollTarget && thumbnailElement) {
+      onScrollTargetElementAdded?.(thumbnailElement);
     }
   }
 

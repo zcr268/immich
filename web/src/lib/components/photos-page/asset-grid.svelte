@@ -12,7 +12,7 @@
   import { formatGroupTitle, splitBucketIntoDateGroups } from '$lib/utils/timeline-util';
   import type { AlbumResponseDto, AssetResponseDto } from '@immich/sdk';
   import { DateTime } from 'luxon';
-  import { createEventDispatcher, onDestroy, onMount, tick } from 'svelte';
+  import { createEventDispatcher, onDestroy, onMount } from 'svelte';
   import IntersectionObserver from '../asset-viewer/intersection-observer.svelte';
   import Portal from '../shared-components/portal/portal.svelte';
   import Scrollbar from '../shared-components/scrollbar/scrollbar.svelte';
@@ -23,7 +23,6 @@
   import { handlePromiseError } from '$lib/utils';
   import { selectAllAssets } from '$lib/utils/asset-utils';
   import { navigate } from '$lib/utils/navigation';
-  import { debounce } from 'lodash-es';
 
   export let isSelectionMode = false;
   export let singleSelect = false;
@@ -88,12 +87,12 @@
     assetStore.disconnect();
   });
 
-  const updateScrollTarget = () => {
+  const updateScrollTarget = async () => {
     const buckets = $assetStore.buckets;
     const top = -(timelineElement.getBoundingClientRect().top - 80.5);
     let prev_bucket_height = 0;
-    for (let i = 0; i < buckets.length; i++) {
-      const cur_bucket_height = prev_bucket_height + buckets[i].bucketHeight;
+    for (const [i, bucket] of buckets.entries()) {
+      const cur_bucket_height = prev_bucket_height + bucket.bucketHeight;
       if (top >= prev_bucket_height && top < cur_bucket_height) {
         const group = assetGroupCmp[i];
         if (!group) {
@@ -101,7 +100,8 @@
         }
         const asset = group.findAssetAtTopLeftPosition(top - prev_bucket_height);
         if (asset) {
-          setGridScrollTarget(asset.id);
+          await setGridScrollTarget(asset.id);
+          break;
         }
       }
       prev_bucket_height = cur_bucket_height;
@@ -196,8 +196,6 @@
     }
   }
 
-  const int = debounce(intersectedHandler, 1000);
-
   function handleScrollTimeline(event: CustomEvent) {
     element.scrollBy(0, event.detail.heightDelta);
   }
@@ -226,12 +224,8 @@
     return !!nextAsset;
   };
 
-  const handleClose = async () => {
+  const handleClose = () => {
     assetViewingStore.showAssetViewer(false);
-    debugger;
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    updateScrollTarget();
   };
 
   const handleAction = async (action: AssetAction, asset: AssetResponseDto) => {
