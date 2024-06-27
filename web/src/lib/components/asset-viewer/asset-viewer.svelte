@@ -83,7 +83,7 @@
 
   const dispatch = createEventDispatcher<{
     action: { type: AssetAction; asset: AssetResponseDto };
-    close: void;
+    close: { asset: AssetResponseDto };
     next: void;
     previous: void;
   }>();
@@ -276,10 +276,9 @@
     $isShowDetail = !$isShowDetail;
   };
 
-  const closeViewer = async () => {
+  const closeViewer = () => {
     if ($slideshowState === SlideshowState.None) {
-      dispatch('close');
-      await navigate({ targetRoute: 'current', assetId: null });
+      dispatch('close', { asset });
     } else {
       $slideshowState = SlideshowState.StopSlideshow;
     }
@@ -507,7 +506,7 @@
           asset,
         });
       }
-      await closeViewer();
+      closeViewer();
     }
   };
 

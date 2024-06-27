@@ -240,7 +240,7 @@ export class AssetStore {
     this.emit(false);
   }
 
-  async loadBucket(bucketDate: string, position: BucketPosition, preventCancel: boolean): Promise<void> {
+  async loadBucket(bucketDate: string, position: BucketPosition, preventCancel?: boolean): Promise<void> {
     const bucket = this.getBucketByDate(bucketDate);
     if (!bucket) {
       return;

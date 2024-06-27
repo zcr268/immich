@@ -224,8 +224,10 @@
     return !!nextAsset;
   };
 
-  const handleClose = () => {
+  const handleClose = async ({ detail: { asset } }: { detail: { asset: AssetResponseDto } }) => {
     assetViewingStore.showAssetViewer(false);
+    await setGridScrollTarget(asset.id);
+    await assetStore.scrollToAssetId($gridScrollTarget);
   };
 
   const handleAction = async (action: AssetAction, asset: AssetResponseDto) => {
@@ -235,7 +237,7 @@
       case AssetAction.RESTORE:
       case AssetAction.DELETE: {
         // find the next asset to show or close the viewer
-        (await handleNext()) || (await handlePrevious()) || handleClose();
+        (await handleNext()) || (await handlePrevious()) || (await handleClose({ detail: { asset } }));
 
         // delete after find the next one
         assetStore.removeAssets([asset.id]);
@@ -519,8 +521,6 @@
                 bucketHeight={bucket.bucketHeight}
                 {viewport}
               />
-            {:else}
-              <p>not</p>
             {/if}
           </div>
         </IntersectionObserver>
