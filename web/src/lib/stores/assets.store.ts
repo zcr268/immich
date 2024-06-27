@@ -227,18 +227,16 @@ export class AssetStore {
     }
     this.timelineHeight = this.buckets.reduce((accumulator, b) => accumulator + b.bucketHeight, 0);
 
-    let height = 0;
     const loaders = [];
+    let height = 0;
     for (const bucket of this.buckets) {
-      if (height < viewport.height) {
-        height += bucket.bucketHeight;
-        loaders.push(this.loadBucket(bucket.bucketDate, BucketPosition.Visible));
-        continue;
+      if (height >= viewport.height) {
+        break;
       }
-      break;
+      height += bucket.bucketHeight;
+      loaders.push(this.loadBucket(bucket.bucketDate, BucketPosition.Visible));
     }
     await Promise.all(loaders);
-    this.emit(false);
   }
 
   async loadBucket(bucketDate: string, position: BucketPosition, preventCancel?: boolean): Promise<void> {
@@ -247,8 +245,7 @@ export class AssetStore {
       return;
     }
 
-    // disable transition from above to visible, as Above implies visible
-    if (!(bucket.position === BucketPosition.Above && position === BucketPosition.Visible)) {
+    if (bucket.position === BucketPosition.Unknown) {
       bucket.position = position;
     }
 
@@ -420,7 +417,8 @@ export class AssetStore {
     }
   }
 
-  async scrollToAssetId(id?: string) {
+  /* Must be paired with matching clearPendingScroll() call */
+  async scheduleScrollToAssetId(id?: string | null) {
     if (!id) {
       return;
     }

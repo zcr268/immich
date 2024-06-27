@@ -1,9 +1,15 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
+  import { beforeNavigate, goto } from '$app/navigation';
   import { AppRoute, AssetAction } from '$lib/constants';
   import type { AssetInteractionStore } from '$lib/stores/asset-interaction.store';
   import { assetViewingStore } from '$lib/stores/asset-viewing.store';
-  import { BucketPosition, isSelectingAllAssets, type AssetStore, type Viewport } from '$lib/stores/assets.store';
+  import {
+    AssetBucket,
+    BucketPosition,
+    isSelectingAllAssets,
+    type AssetStore,
+    type Viewport,
+  } from '$lib/stores/assets.store';
   import { locale, showDeleteModal } from '$lib/stores/preferences.store';
   import { isSearchEnabled } from '$lib/stores/search.store';
   import { featureFlags } from '$lib/stores/server-config.store';
@@ -35,6 +41,9 @@
   export let album: AlbumResponseDto | null = null;
   export let isShowDeleteConfirmation = false;
 
+  //TODO - calculate this
+  const NAVBAR_HEIGHT = 80.5;
+
   $: isTrashEnabled = $featureFlags.loaded && $featureFlags.trash;
 
   const { assetSelectionCandidates, assetSelectionStart, selectedGroup, selectedAssets, isMultiSelectState } =
@@ -53,7 +62,6 @@
   let showShortcuts = false;
   let showSkeleton = true;
   let assetGroupCmp: AssetDateGroup[] = [];
-  let assetGroupElem: HTMLElement[] = [];
 
   $: timelineY = element?.scrollTop || 0;
   $: isEmpty = $assetStore.initialized && $assetStore.buckets.length === 0;
@@ -71,12 +79,26 @@
 
   const dispatch = createEventDispatcher<{ select: AssetResponseDto; escape: void }>();
 
+  beforeNavigate(({ type, from, to, complete }) => {
+    const { id: currentRoute } = from?.route || { id: undefined };
+    const { id: nextRoute } = to?.route || { id: undefined };
+    if (type !== 'link' && type !== 'goto') {
+      return;
+    }
+    if (currentRoute && currentRoute !== nextRoute) {
+      complete.then(
+        () => setGridScrollTarget(null),
+        () => void 0,
+      );
+    }
+  });
+
   onMount(async () => {
     showSkeleton = false;
     assetStore.connect();
 
     await assetStore.init(viewport);
-    await assetStore.scrollToAssetId($gridScrollTarget);
+    await assetStore.scheduleScrollToAssetId($gridScrollTarget);
   });
 
   onDestroy(() => {
@@ -89,23 +111,40 @@
 
   const updateScrollTarget = async () => {
     const buckets = $assetStore.buckets;
-    const top = -(timelineElement.getBoundingClientRect().top - 80.5);
+    const top = -(timelineElement.getBoundingClientRect().top - NAVBAR_HEIGHT);
     let prev_bucket_height = 0;
     for (const [i, bucket] of buckets.entries()) {
       const cur_bucket_height = prev_bucket_height + bucket.bucketHeight;
       if (top >= prev_bucket_height && top < cur_bucket_height) {
         const group = assetGroupCmp[i];
         if (!group) {
-          break;
+          return;
         }
         const asset = group.findAssetAtTopLeftPosition(top - prev_bucket_height);
         if (asset) {
           await setGridScrollTarget(asset.id);
-          break;
+          return;
         }
       }
       prev_bucket_height = cur_bucket_height;
     }
+    await setGridScrollTarget(null);
+  };
+
+  const scrollToTarget = ({ target, offset }: { target: AssetBucket; offset: number }) => {
+    const buckets = $assetStore.buckets;
+
+    // Set 'above' to all bucket positions above the target so that in case they
+    // are loaded, the scroll positions are maintained
+    for (const bucket of buckets) {
+      if (bucket === target) {
+        break;
+      }
+      bucket.position = BucketPosition.Above;
+    }
+
+    element.scrollTo({ top: offset });
+    $assetStore.clearPendingScroll();
   };
 
   const trashOrDelete = async (force: boolean = false) => {
@@ -227,7 +266,7 @@
   const handleClose = async ({ detail: { asset } }: { detail: { asset: AssetResponseDto } }) => {
     assetViewingStore.showAssetViewer(false);
     await setGridScrollTarget(asset.id);
-    await assetStore.scrollToAssetId($gridScrollTarget);
+    await assetStore.scheduleScrollToAssetId($gridScrollTarget);
   };
 
   const handleAction = async (action: AssetAction, asset: AssetResponseDto) => {
@@ -458,7 +497,7 @@
   {assetStore}
   height={viewport.height}
   {timelineY}
-  on:scrollTimeline={({ detail }) => (element.scrollTop = detail)}
+  on:scrollTimeline={({ detail }) => ((element.scrollTop = detail), void updateScrollTarget())}
 />
 
 <!-- Right margin MUST be equal to the width of immich-scrubbable-scrollbar -->
@@ -505,7 +544,6 @@
             {#if showGroup}
               <AssetDateGroup
                 bind:this={assetGroupCmp[index]}
-                bind:element={assetGroupElem[index]}
                 {withStacked}
                 {showArchiveIcon}
                 {assetStore}
@@ -516,6 +554,7 @@
                 on:shift={handleScrollTimeline}
                 on:selectAssetCandidates={({ detail: asset }) => handleSelectAssetCandidates(asset)}
                 on:selectAssets={({ detail: asset }) => handleSelectAssets(asset)}
+                onScrollTarget={scrollToTarget}
                 assets={bucket.assets}
                 bucketDate={bucket.bucketDate}
                 bucketHeight={bucket.bucketHeight}

@@ -43,7 +43,7 @@
   export let scrollTarget = false;
 
   export let onClick: ((asset: AssetResponseDto, event: Event) => void) | undefined = undefined;
-  export let onScrollTargetElementAdded: ((scrollTargetElement: HTMLElement) => void) | undefined = undefined;
+  export let onScrollTarget: ((scrollTargetElement: HTMLElement) => void) | undefined = undefined;
 
   export let thumbnailElement: HTMLElement | undefined = undefined;
   let className = '';
@@ -53,7 +53,7 @@
 
   $: {
     if (scrollTarget && thumbnailElement) {
-      onScrollTargetElementAdded?.(thumbnailElement);
+      onScrollTarget?.(thumbnailElement);
     }
   }
 

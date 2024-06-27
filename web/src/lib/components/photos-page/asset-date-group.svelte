@@ -2,7 +2,7 @@
   import Icon from '$lib/components/elements/icon.svelte';
   import type { AssetInteractionStore } from '$lib/stores/asset-interaction.store';
   import { assetViewingStore } from '$lib/stores/asset-viewing.store';
-  import { BucketPosition, type AssetStore, type Viewport } from '$lib/stores/assets.store';
+  import { AssetBucket, type AssetStore, type Viewport } from '$lib/stores/assets.store';
   import { locale } from '$lib/stores/preferences.store';
   import { getAssetRatio } from '$lib/utils/asset-utils';
   import {
@@ -31,6 +31,11 @@
 
   export let assetStore: AssetStore;
   export let assetInteractionStore: AssetInteractionStore;
+  export let onScrollTarget: (({ target, offset }: { target: AssetBucket; offset: number }) => void) | undefined =
+    undefined;
+
+  /* TODO figure out a way to calculate this*/
+  const TITLE_HEIGHT = 51;
 
   function nextRowIndex(geometry: GeometryType, start: number) {
     const offsetIndex = geometry.boxes.slice(start).findIndex((box) => box.left === 0);
@@ -55,6 +60,7 @@
       j = nextRow;
     }
   }
+
   export function findAssetAtTopLeftPosition(top: number) {
     if (top < 0) {
       return;
@@ -66,7 +72,7 @@
       const next_number = i === geometry.length - 1 ? bucketHeight : geometry[i + 1].topOffset;
 
       if (top >= cur_number && top < next_number) {
-        return findLeftMost(geo, top - i * 51);
+        return findLeftMost(geo, top - i * TITLE_HEIGHT);
       }
     }
   }
@@ -96,27 +102,16 @@
     const thumbBox = thumbnailElement?.offsetParent as HTMLElement;
     const imageGrid = thumbBox.offsetParent as HTMLElement;
     const section = imageGrid.offsetParent as HTMLElement;
-    const sectionTitle = imageGrid.previousElementSibling as HTMLElement;
 
     const offsetFromImageGrid = thumbBox.offsetTop;
     const previousSections = imageGrid.offsetTop;
-    const headerSize = sectionTitle.getBoundingClientRect().height;
 
     const sectionOffset = section.offsetTop;
-    const offset = offsetFromImageGrid + previousSections + sectionOffset - headerSize;
+    const offset = offsetFromImageGrid + previousSections + sectionOffset - TITLE_HEIGHT;
 
-    const buckets = $assetStore.buckets;
+    const bucket = $assetStore.buckets.find((bucket) => bucket.bucketDate === section.dataset.bucketDate);
 
-    for (const bucket of buckets) {
-      if (bucket.bucketDate === section.dataset.bucketDate) {
-        break;
-      }
-      bucket.position = BucketPosition.Above;
-    }
-
-    document.querySelector('#asset-grid')?.scrollTo({ top: offset });
-
-    $assetStore.clearPendingScroll();
+    onScrollTarget?.({ target: bucket!, offset });
   };
 
   $: {
@@ -189,7 +184,7 @@
 
 <section
   id="asset-group-by-date"
-  class="flex flex-col flex-wrap gap-x-12"
+  class="flex flex-wrap gap-x-12"
   data-bucket-date={bucketDate}
   bind:clientHeight={actualBucketHeight}
   bind:this={element}
@@ -201,7 +196,7 @@
 
     <!-- svelte-ignore a11y-no-static-element-interactions -->
     <div
-      class="contents"
+      class="flex flex-col"
       on:mouseenter={() => {
         isMouseOverGroup = true;
         assetMouseEventHandler(groupTitle, null);
@@ -213,7 +208,6 @@
     >
       <!-- Date group title -->
       <div
-        data-group-idx={groupIndex}
         class="flex z-[100] sticky top-0 pt-7 pb-5 h-6 place-items-center text-xs font-medium text-immich-fg bg-immich-bg dark:bg-immich-dark-bg dark:text-immich-dark-fg md:text-sm"
         style="width: {geometry[groupIndex].containerWidth}px"
       >
@@ -254,7 +248,7 @@
               {showArchiveIcon}
               {asset}
               {groupIndex}
-              onScrollTargetElementAdded={scrollToThumbnail}
+              onScrollTarget={scrollToThumbnail}
               onClick={(asset, event) => {
                 if (isSelectionMode || $isMultiSelectState) {
                   event.preventDefault();

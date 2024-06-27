@@ -7,7 +7,7 @@ function createAssetViewingStore() {
   const viewingAssetStoreState = writable<AssetResponseDto>();
   const preloadAssets = writable<AssetResponseDto[]>([]);
   const viewState = writable<boolean>(false);
-  const scrollTarget = writable<string | undefined>();
+  const scrollTarget = writable<string | null | undefined>();
 
   const setAsset = (asset: AssetResponseDto, assetsToPreload: AssetResponseDto[] = []) => {
     preloadAssets.set(assetsToPreload);
@@ -24,7 +24,7 @@ function createAssetViewingStore() {
     viewState.set(show);
   };
 
-  const setGridScrollTarget = async (assetGridScrollTarget: string) => {
+  const setGridScrollTarget = async (assetGridScrollTarget: string | null | undefined) => {
     scrollTarget.set(assetGridScrollTarget);
     const assetId = get(viewState) ? get(viewingAssetStoreState)?.id : null;
     await navigate({ targetRoute: 'current', assetId, assetGridScrollTarget });
