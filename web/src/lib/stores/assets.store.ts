@@ -206,6 +206,7 @@ export class AssetStore {
       assets: [],
       cancelToken: null,
       position: BucketPosition.Unknown,
+      preventCancel: false,
     }));
 
     // if loading an asset, the grid-view may be hidden, which means
@@ -373,6 +374,7 @@ export class AssetStore {
           assets: [],
           cancelToken: null,
           position: BucketPosition.Unknown,
+          preventCancel: false,
         };
 
         this.buckets.push(bucket);
