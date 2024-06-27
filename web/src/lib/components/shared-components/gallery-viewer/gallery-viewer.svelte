@@ -14,6 +14,7 @@
   import { AppRoute, AssetAction } from '$lib/constants';
   import { goto } from '$app/navigation';
   import { handlePromiseError } from '$lib/utils';
+  import { t } from 'svelte-i18n';
 
   const dispatch = createEventDispatcher<{ intersected: { container: HTMLDivElement; position: BucketPosition } }>();
 
@@ -53,7 +54,7 @@
         await navigate({ targetRoute: 'current', assetId: $viewingAsset.id });
       }
     } catch (error) {
-      handleError(error, 'Cannot navigate to the next asset');
+      handleError(error, $t('errors.cannot_navigate_next_asset'));
     }
   };
 
@@ -64,7 +65,7 @@
         await navigate({ targetRoute: 'current', assetId: $viewingAsset.id });
       }
     } catch (error) {
-      handleError(error, 'Cannot navigate to previous asset');
+      handleError(error, $t('errors.cannot_navigate_previous_asset'));
     }
   };
 
