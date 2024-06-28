@@ -32,13 +32,51 @@ export class AssetBucket {
    * The DOM height of the bucket in pixel
    * This value is first estimated by the number of asset and later is corrected as the user scroll
    */
-  bucketHeight!: number;
+  bucketHeight: number = 0;
   bucketDate!: string;
-  bucketCount!: number;
-  assets!: AssetResponseDto[];
-  cancelToken!: AbortController | null;
-  position!: BucketPosition;
-  preventCancel!: boolean;
+  bucketCount: number = 0;
+  assets: AssetResponseDto[] = [];
+  cancelToken: AbortController | null = null;
+  position: BucketPosition = BucketPosition.Unknown;
+  /**
+   * Prevent this asset's load from being canceled; i.e. to force load of offscreen asset.
+   */
+  preventCancel: boolean = false;
+  /**
+   * A promise that resolves once the bucket is loaded, and rejects if bucket is canceled.
+   */
+  complete!: Promise<void>;
+
+  constructor(props: Partial<AssetBucket> & { bucketDate: string }) {
+    Object.assign(this, props);
+    this.init();
+  }
+
+  private init() {
+    this.complete = new Promise((resolve, reject) => {
+      this.$loadedSignal = resolve;
+      this.$canceledSignal = reject;
+    });
+    // supress uncaught rejection
+    this.complete.catch(() => void 0);
+  }
+
+  private $loadedSignal!: () => void;
+  private $canceledSignal!: () => void;
+
+  cancel() {
+    if (this.preventCancel) {
+      return;
+    }
+    this.position = BucketPosition.Unknown;
+    this.cancelToken?.abort();
+    this.$canceledSignal;
+    this.init();
+  }
+
+  loaded() {
+    this.$loadedSignal();
+  }
 }
 
 const isMismatched = (option: boolean | undefined, value: boolean): boolean =>
@@ -76,6 +114,10 @@ export class AssetStore {
   private pendingChanges: PendingChange[] = [];
   private unsubscribers: Unsubscriber[] = [];
   private options: AssetApiGetTimeBucketsRequest;
+  private viewport: Viewport = {
+    height: 0,
+    width: 0,
+  };
 
   initialized = false;
   timelineHeight = 0;
@@ -197,18 +239,10 @@ export class AssetStore {
       key: getKey(),
     });
 
+    this.buckets = timebuckets.map(
+      (bucket) => new AssetBucket({ bucketDate: bucket.timeBucket, bucketCount: bucket.count }),
+    );
     this.initialized = true;
-
-    this.buckets = timebuckets.map((bucket) => ({
-      bucketDate: bucket.timeBucket,
-      bucketHeight: 0,
-      bucketCount: bucket.count,
-      assets: [],
-      cancelToken: null,
-      position: BucketPosition.Unknown,
-      preventCancel: false,
-    }));
-
     // if loading an asset, the grid-view may be hidden, which means
     // it has 0 width and height. No need to update bucket or timeline
     // heights in this case. Later, updateViewport will be called to
@@ -219,10 +253,15 @@ export class AssetStore {
   }
 
   async updateViewport(viewport: Viewport) {
+    if (!this.initialized && this.viewport.height === viewport.height && this.viewport.width === viewport.width) {
+      return;
+    }
+    this.viewport = { ...viewport };
+
     for (const bucket of this.buckets) {
       const unwrappedWidth = (3 / 2) * bucket.bucketCount * THUMBNAIL_HEIGHT * (7 / 10);
       const rows = Math.ceil(unwrappedWidth / viewport.width);
-      const height = rows * THUMBNAIL_HEIGHT;
+      const height = 51 + rows * THUMBNAIL_HEIGHT;
       bucket.bucketHeight = height;
     }
     this.timelineHeight = this.buckets.reduce((accumulator, b) => accumulator + b.bucketHeight, 0);
@@ -244,22 +283,26 @@ export class AssetStore {
     if (!bucket) {
       return;
     }
-
     if (bucket.position === BucketPosition.Unknown) {
+      // don't overwrite position if known
       bucket.position = position;
     }
-
-    if (bucket.cancelToken || bucket.assets.length > 0) {
-      this.emit(false);
+    if (bucket.bucketCount === bucket.assets.length) {
+      // already loaded
       return;
     }
 
-    if (preventCancel) {
-      bucket.preventCancel = true;
+    if (bucket.cancelToken != null && bucket.bucketCount !== bucket.assets.length) {
+      // if promise is pending, and preventCancel is requested, then don't overwrite it
+      if (!bucket.preventCancel) {
+        bucket.preventCancel = !!preventCancel;
+      }
+      await bucket.complete;
+      return;
     }
+    bucket.preventCancel = !!preventCancel;
 
-    bucket.cancelToken = new AbortController();
-
+    const cancelToken = (bucket.cancelToken = new AbortController());
     try {
       const assets = await getTimeBucket(
         {
@@ -267,8 +310,12 @@ export class AssetStore {
           timeBucket: bucketDate,
           key: getKey(),
         },
-        { signal: bucket.cancelToken.signal },
+        { signal: cancelToken.signal },
       );
+
+      if (cancelToken.signal.aborted) {
+        return;
+      }
 
       if (this.albumId) {
         const albumAssets = await getTimeBucket(
@@ -280,32 +327,22 @@ export class AssetStore {
           },
           { signal: bucket.cancelToken.signal },
         );
-
+        if (cancelToken.signal.aborted) {
+          return;
+        }
         for (const asset of albumAssets) {
           this.albumAssets.add(asset.id);
         }
       }
 
-      if (bucket.cancelToken.signal.aborted) {
-        return;
-      }
-
       bucket.assets = assets;
-
       this.emit(true);
+      bucket.loaded();
     } catch (error) {
       handleError(error, 'Failed to load assets');
     } finally {
       bucket.cancelToken = null;
     }
-  }
-
-  cancelBucket(bucket: AssetBucket) {
-    if (bucket.preventCancel) {
-      return;
-    }
-    bucket.position = BucketPosition.Unknown;
-    bucket.cancelToken?.abort();
   }
 
   updateBucket(bucketDate: string, height: number) {
@@ -321,9 +358,7 @@ export class AssetStore {
     bucket.position = BucketPosition.Unknown;
 
     this.timelineHeight += delta;
-
     this.emit(false);
-
     return scrollTimeline ? delta : 0;
   }
 
@@ -364,16 +399,7 @@ export class AssetStore {
       let bucket = this.getBucketByDate(timeBucket);
 
       if (!bucket) {
-        bucket = {
-          bucketDate: timeBucket,
-          bucketHeight: THUMBNAIL_HEIGHT,
-          bucketCount: 0,
-          assets: [],
-          cancelToken: null,
-          position: BucketPosition.Unknown,
-          preventCancel: false,
-        };
-
+        bucket = new AssetBucket({ bucketDate: timeBucket, bucketHeight: THUMBNAIL_HEIGHT });
         this.buckets.push(bucket);
       }
 
@@ -403,37 +429,52 @@ export class AssetStore {
     return this.buckets.find((bucket) => bucket.bucketDate === bucketDate) || null;
   }
 
-  async findBucketForAssetId(id: string) {
+  private async findBucketForAssetId(id: string) {
     const bucketInfo = this.assetToBucket[id];
     if (bucketInfo) {
       return bucketInfo.bucket;
     }
+
     const asset = await getAssetInfo({ id });
     if (asset) {
-      const info = await this.getBucketInfoForAsset(asset, true);
-      if (info) {
-        return info.bucket;
-      }
+      const bucket = await this.loadBucketAtTime(asset.localDateTime, true);
+      return bucket;
     }
   }
 
   /* Must be paired with matching clearPendingScroll() call */
   async scheduleScrollToAssetId(id?: string | null) {
     if (!id) {
-      return;
+      return false;
     }
-
-    const bucket = await this.findBucketForAssetId(id);
-    if (bucket) {
-      this.pendingScrollBucket = bucket;
-      this.pendingScrollAssetId = id;
-      this.emit(false);
+    try {
+      const bucket = await this.findBucketForAssetId(id);
+      if (bucket) {
+        this.pendingScrollBucket = bucket;
+        this.pendingScrollAssetId = id;
+        this.emit(false);
+      }
+    } catch {
+      return false;
     }
+    return true;
   }
 
   clearPendingScroll() {
     this.pendingScrollBucket = undefined;
     this.pendingScrollAssetId = undefined;
+  }
+
+  private async loadBucketAtTime(localDateTime: string, preventCancel?: boolean) {
+    let date = fromLocalDateTime(localDateTime);
+    if (this.options.size == TimeBucketSize.Month) {
+      date = date.set({ day: 1, hour: 0, minute: 0, second: 0, millisecond: 0 });
+    } else if (this.options.size == TimeBucketSize.Day) {
+      date = date.set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
+    }
+    const iso = date.toISO()!;
+    await this.loadBucket(iso, BucketPosition.Unknown, preventCancel);
+    return this.getBucketByDate(iso);
   }
 
   private async getBucketInfoForAsset(
@@ -444,13 +485,7 @@ export class AssetStore {
     if (bucketInfo) {
       return bucketInfo;
     }
-    let date = fromLocalDateTime(localDateTime);
-    if (this.options.size == TimeBucketSize.Month) {
-      date = date.set({ day: 1, hour: 0, minute: 0, second: 0, millisecond: 0 });
-    } else if (this.options.size == TimeBucketSize.Day) {
-      date = date.set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
-    }
-    await this.loadBucket(date.toISO()!, BucketPosition.Unknown, preventCancel);
+    await this.loadBucketAtTime(localDateTime, preventCancel);
     return this.assetToBucket[id] || null;
   }
 

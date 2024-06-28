@@ -38,15 +38,15 @@ describe('AssetStore', () => {
     it('calculates bucket height', () => {
       expect(assetStore.buckets).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ bucketDate: '2024-03-01T00:00:00.000Z', bucketHeight: 235 }),
-          expect.objectContaining({ bucketDate: '2024-02-01T00:00:00.000Z', bucketHeight: 3760 }),
-          expect.objectContaining({ bucketDate: '2024-01-01T00:00:00.000Z', bucketHeight: 235 }),
+          expect.objectContaining({ bucketDate: '2024-03-01T00:00:00.000Z', bucketHeight: 286 }),
+          expect.objectContaining({ bucketDate: '2024-02-01T00:00:00.000Z', bucketHeight: 3811 }),
+          expect.objectContaining({ bucketDate: '2024-01-01T00:00:00.000Z', bucketHeight: 286 }),
         ]),
       );
     });
 
     it('calculates timeline height', () => {
-      expect(assetStore.timelineHeight).toBe(4230);
+      expect(assetStore.timelineHeight).toBe(4383);
     });
   });
 
@@ -100,7 +100,7 @@ describe('AssetStore', () => {
       const loadPromise = assetStore.loadBucket(bucket!.bucketDate, BucketPosition.Unknown);
 
       const abortSpy = vi.spyOn(bucket!.cancelToken!, 'abort');
-      assetStore.cancelBucket(bucket!);
+      bucket?.cancel();
       expect(abortSpy).toBeCalledTimes(1);
 
       await loadPromise;
@@ -122,7 +122,7 @@ describe('AssetStore', () => {
       const bucket = assetStore.getBucketByDate('2024-01-01T00:00:00.000Z');
       const loadPromise = assetStore.loadBucket(bucket!.bucketDate, BucketPosition.Unknown);
 
-      assetStore.cancelBucket(bucket!);
+      bucket?.cancel();
       await loadPromise;
       expect(bucket?.assets.length).toEqual(0);
 

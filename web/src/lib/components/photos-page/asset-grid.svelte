@@ -29,6 +29,7 @@
   import { handlePromiseError } from '$lib/utils';
   import { selectAllAssets } from '$lib/utils/asset-utils';
   import { navigate } from '$lib/utils/navigation';
+  import { throttle } from 'lodash-es';
 
   export let isSelectionMode = false;
   export let singleSelect = false;
@@ -62,6 +63,7 @@
   let showShortcuts = false;
   let showSkeleton = true;
   let assetGroupCmp: AssetDateGroup[] = [];
+  let internalScroll = false;
 
   $: timelineY = element?.scrollTop || 0;
   $: isEmpty = $assetStore.initialized && $assetStore.buckets.length === 0;
@@ -94,11 +96,19 @@
   });
 
   onMount(async () => {
-    showSkeleton = false;
     assetStore.connect();
 
     await assetStore.init(viewport);
-    await assetStore.scheduleScrollToAssetId($gridScrollTarget);
+
+    if ($gridScrollTarget) {
+      const requested = await assetStore.scheduleScrollToAssetId($gridScrollTarget);
+      if (requested) {
+        return;
+      }
+      // hash invalid
+      await setGridScrollTarget(null);
+    }
+    showSkeleton = false;
   });
 
   onDestroy(() => {
@@ -109,16 +119,25 @@
     assetStore.disconnect();
   });
 
-  const updateScrollTarget = async () => {
+  const updateScroll = async () => {
     const buckets = $assetStore.buckets;
+    if (internalScroll) {
+      internalScroll = false;
+      return;
+    }
+
+    // const buckets = $assetStore.buckets;
     const top = -(timelineElement.getBoundingClientRect().top - NAVBAR_HEIGHT);
+    if (top < 0) {
+      return;
+    }
     let prev_bucket_height = 0;
     for (const [i, bucket] of buckets.entries()) {
       const cur_bucket_height = prev_bucket_height + bucket.bucketHeight;
       if (top >= prev_bucket_height && top < cur_bucket_height) {
         const group = assetGroupCmp[i];
         if (!group) {
-          return;
+          continue;
         }
         const asset = group.findAssetAtTopLeftPosition(top - prev_bucket_height);
         if (asset) {
@@ -130,6 +149,8 @@
     }
     await setGridScrollTarget(null);
   };
+
+  const updateScrollTarget = throttle(updateScroll, 50);
 
   const scrollToTarget = ({ target, offset }: { target: AssetBucket; offset: number }) => {
     const buckets = $assetStore.buckets;
@@ -143,8 +164,10 @@
       bucket.position = BucketPosition.Above;
     }
 
+    internalScroll = true;
     element.scrollTo({ top: offset });
     $assetStore.clearPendingScroll();
+    showSkeleton = false;
   };
 
   const trashOrDelete = async (force: boolean = false) => {
@@ -226,12 +249,12 @@
     }
   };
 
-  async function intersectedHandler(event: CustomEvent) {
+  function intersectedHandler(event: CustomEvent) {
     const element_ = event.detail.container as HTMLElement;
     const target = element_.firstChild as HTMLElement;
     if (target) {
       const bucketDate = target.id.split('_')[1];
-      await assetStore.loadBucket(bucketDate, event.detail.position);
+      void assetStore.loadBucket(bucketDate, event.detail.position);
     }
   }
 
@@ -508,11 +531,11 @@
   bind:clientHeight={viewport.height}
   bind:clientWidth={viewport.width}
   bind:this={element}
-  on:scroll={() => (handleTimelineScroll(), updateScrollTarget())}
+  on:scroll={() => (handleTimelineScroll(), void updateScrollTarget())}
 >
   <!-- skeleton -->
   {#if showSkeleton}
-    <div class="mt-8 animate-pulse">
+    <div id="skeleton" class="absolute top-0 object-cover mt-8 animate-pulse">
       <div class="mb-2 h-4 w-24 rounded-full bg-immich-primary/20 dark:bg-immich-dark-primary/20" />
       <div class="flex w-[120%] flex-wrap">
         {#each Array.from({ length: 100 }) as _}
@@ -523,17 +546,23 @@
   {/if}
 
   {#if element}
-    <slot />
-
-    <!-- (optional) empty placeholder -->
+    <div style:visibility={showSkeleton ? 'hidden' : 'visible'}>
+      <slot />
+    </div>
     {#if isEmpty}
+      <!-- (optional) empty placeholder -->
       <slot name="empty" />
     {/if}
-    <section bind:this={timelineElement} id="virtual-timeline" style:height={$assetStore.timelineHeight + 'px'}>
+    <section
+      bind:this={timelineElement}
+      id="virtual-timeline"
+      style:visibility={showSkeleton ? 'hidden' : 'visible'}
+      style:height={$assetStore.timelineHeight + 'px'}
+    >
       {#each $assetStore.buckets as bucket, index (bucket.bucketDate)}
         <IntersectionObserver
           on:intersected={intersectedHandler}
-          on:hidden={() => assetStore.cancelBucket(bucket)}
+          on:hidden={() => bucket.cancel()}
           let:intersecting
           top={750}
           bottom={750}
@@ -591,5 +620,14 @@
   #asset-grid {
     contain: layout;
     scrollbar-width: none;
+  }
+  @keyframes delayedVisibility {
+    to {
+      visibility: visible;
+    }
+  }
+  #skeleton {
+    visibility: hidden;
+    animation: 0s linear 0.3s forwards delayedVisibility;
   }
 </style>

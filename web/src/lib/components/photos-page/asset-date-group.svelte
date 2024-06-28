@@ -50,7 +50,8 @@
       const rowTop = geometry.boxes[j].top + geoTopOffset;
       const nextRow = nextRowIndex(geometry, j + 1);
       const nextRowTop = (nextRow === -1 ? geometry.containerHeight : geometry.boxes[nextRow].top) + geoTopOffset;
-      if (top >= rowTop && top < nextRowTop) {
+      // 0.2 is row height tolerance
+      if (top >= rowTop - 0.2 && top < nextRowTop) {
         return geometry.assets[j];
       }
 
@@ -98,7 +99,7 @@
 
   let geometry: GeometryType[] = [];
 
-  let scrollToThumbnail = (thumbnailElement: HTMLElement) => {
+  const scrollToThumbnail = (thumbnailElement: HTMLElement) => {
     const thumbBox = thumbnailElement?.offsetParent as HTMLElement;
     const imageGrid = thumbBox.offsetParent as HTMLElement;
     const section = imageGrid.offsetParent as HTMLElement;
