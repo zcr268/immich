@@ -158,6 +158,8 @@ export type PersonWithFacesResponseDto = {
     isHidden: boolean;
     name: string;
     thumbnailPath: string;
+    /** This property was added in v1.107.0 */
+    updatedAt?: string;
 };
 export type SmartInfoResponseDto = {
     objects?: string[] | null;
@@ -432,6 +434,8 @@ export type PersonResponseDto = {
     isHidden: boolean;
     name: string;
     thumbnailPath: string;
+    /** This property was added in v1.107.0 */
+    updatedAt?: string;
 };
 export type AssetFaceResponseDto = {
     boundingBoxX1: number;
@@ -2381,6 +2385,9 @@ export function getSearchSuggestions({ country, make, model, state, $type }: {
         ...opts
     }));
 }
+/**
+ * This property was deprecated in v1.107.0
+ */
 export function getAboutInfo(opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
@@ -2389,6 +2396,9 @@ export function getAboutInfo(opts?: Oazapfts.RequestOpts) {
         ...opts
     }));
 }
+/**
+ * This property was deprecated in v1.107.0
+ */
 export function getServerConfig(opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
@@ -2397,6 +2407,9 @@ export function getServerConfig(opts?: Oazapfts.RequestOpts) {
         ...opts
     }));
 }
+/**
+ * This property was deprecated in v1.107.0
+ */
 export function getServerFeatures(opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
@@ -2405,6 +2418,9 @@ export function getServerFeatures(opts?: Oazapfts.RequestOpts) {
         ...opts
     }));
 }
+/**
+ * This property was deprecated in v1.107.0
+ */
 export function getSupportedMediaTypes(opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
@@ -2413,6 +2429,9 @@ export function getSupportedMediaTypes(opts?: Oazapfts.RequestOpts) {
         ...opts
     }));
 }
+/**
+ * This property was deprecated in v1.107.0
+ */
 export function pingServer(opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
@@ -2421,6 +2440,9 @@ export function pingServer(opts?: Oazapfts.RequestOpts) {
         ...opts
     }));
 }
+/**
+ * This property was deprecated in v1.107.0
+ */
 export function getServerStatistics(opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
@@ -2429,6 +2451,9 @@ export function getServerStatistics(opts?: Oazapfts.RequestOpts) {
         ...opts
     }));
 }
+/**
+ * This property was deprecated in v1.107.0
+ */
 export function getStorage(opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
@@ -2437,6 +2462,9 @@ export function getStorage(opts?: Oazapfts.RequestOpts) {
         ...opts
     }));
 }
+/**
+ * This property was deprecated in v1.107.0
+ */
 export function getTheme(opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
@@ -2445,6 +2473,9 @@ export function getTheme(opts?: Oazapfts.RequestOpts) {
         ...opts
     }));
 }
+/**
+ * This property was deprecated in v1.107.0
+ */
 export function getServerVersion(opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;

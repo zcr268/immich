@@ -12,8 +12,9 @@ import {
   ServerStatsResponseDto,
   ServerStorageResponseDto,
   UsageByUserDto,
-} from 'src/dtos/server-info.dto';
+} from 'src/dtos/server.dto';
 import { SystemMetadataKey } from 'src/entities/system-metadata.entity';
+import { OnEvents } from 'src/interfaces/event.interface';
 import { ILoggerRepository } from 'src/interfaces/logger.interface';
 import { IServerInfoRepository } from 'src/interfaces/server-info.interface';
 import { IStorageRepository } from 'src/interfaces/storage.interface';
@@ -24,7 +25,7 @@ import { mimeTypes } from 'src/utils/mime-types';
 import { isDuplicateDetectionEnabled, isFacialRecognitionEnabled, isSmartSearchEnabled } from 'src/utils/misc';
 
 @Injectable()
-export class ServerInfoService {
+export class ServerService implements OnEvents {
   private configCore: SystemConfigCore;
 
   constructor(
@@ -34,21 +35,22 @@ export class ServerInfoService {
     @Inject(IServerInfoRepository) private serverInfoRepository: IServerInfoRepository,
     @Inject(ILoggerRepository) private logger: ILoggerRepository,
   ) {
-    this.logger.setContext(ServerInfoService.name);
+    this.logger.setContext(ServerService.name);
     this.configCore = SystemConfigCore.create(systemMetadataRepository, this.logger);
   }
 
-  async init(): Promise<void> {
+  async onBootstrapEvent(): Promise<void> {
     const featureFlags = await this.getFeatures();
     if (featureFlags.configFile) {
       await this.systemMetadataRepository.set(SystemMetadataKey.ADMIN_ONBOARDING, {
         isOnboarded: true,
       });
     }
+    this.logger.log(`Feature Flags: ${JSON.stringify(await this.getFeatures(), null, 2)}`);
   }
 
   async getAboutInfo(): Promise<ServerAboutResponseDto> {
-    const version = serverVersion.toString();
+    const version = `v${serverVersion.toString()}`;
     const buildMetadata = getBuildMetadata();
     const buildVersions = await this.serverInfoRepository.getBuildVersions();
 
