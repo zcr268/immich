@@ -126,7 +126,6 @@
       return;
     }
 
-    // const buckets = $assetStore.buckets;
     const top = -(timelineElement.getBoundingClientRect().top - NAVBAR_HEIGHT);
     if (top < 0) {
       return;
@@ -517,6 +516,7 @@
 {/if}
 
 <Scrollbar
+  invisible={showSkeleton}
   {assetStore}
   height={viewport.height}
   {timelineY}
@@ -546,17 +546,18 @@
   {/if}
 
   {#if element}
-    <div style:visibility={showSkeleton ? 'hidden' : 'visible'}>
+    <div class:invisible={showSkeleton}>
       <slot />
+      {#if isEmpty}
+        <!-- (optional) empty placeholder -->
+        <slot name="empty" />
+      {/if}
     </div>
-    {#if isEmpty}
-      <!-- (optional) empty placeholder -->
-      <slot name="empty" />
-    {/if}
+
     <section
       bind:this={timelineElement}
       id="virtual-timeline"
-      style:visibility={showSkeleton ? 'hidden' : 'visible'}
+      class:invisible={showSkeleton}
       style:height={$assetStore.timelineHeight + 'px'}
     >
       {#each $assetStore.buckets as bucket, index (bucket.bucketDate)}

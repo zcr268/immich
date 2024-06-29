@@ -325,7 +325,7 @@ export class AssetStore {
             size: this.options.size,
             key: getKey(),
           },
-          { signal: bucket.cancelToken.signal },
+          { signal: cancelToken.signal },
         );
         if (cancelToken.signal.aborted) {
           return;
