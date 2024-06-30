@@ -18,11 +18,13 @@
     mdiMotionPlayOutline,
     mdiRotate360,
   } from '@mdi/js';
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
   import { fade } from 'svelte/transition';
   import ImageThumbnail from './image-thumbnail.svelte';
   import VideoThumbnail from './video-thumbnail.svelte';
   import { currentUrlReplaceAssetId } from '$lib/utils/navigation';
+  import { AssetStore } from '$lib/stores/assets.store';
+  import { assetViewingStore } from '$lib/stores/asset-viewing.store';
 
   const dispatch = createEventDispatcher<{
     select: { asset: AssetResponseDto };
@@ -44,6 +46,7 @@
   export let root: HTMLElement | undefined = undefined;
   export let bottom: string | undefined = undefined;
 
+  export let assetStore: AssetStore | undefined = undefined;
   export let onClick: ((asset: AssetResponseDto, event: Event) => void) | undefined = undefined;
   export let onScrollTarget: ((scrollTargetElement: HTMLElement) => void) | undefined = undefined;
 
@@ -54,7 +57,9 @@
   let mouseOver = false;
 
   $: {
-    if (scrollTarget && thumbnailElement) {
+    // console.log(asset.id);
+    if ($assetStore?.pendingScrollAssetId === asset.id && thumbnailElement) {
+      console.log('READDD FOUND IT!!', scrollTarget);
       onScrollTarget?.(thumbnailElement);
     }
   }

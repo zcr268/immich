@@ -207,7 +207,7 @@
         asset = assetUpdate;
       }
     });
-    await navigate({ targetRoute: 'current', assetId: asset.id });
+
     slideshowStateUnsubscribe = slideshowState.subscribe((value) => {
       if (value === SlideshowState.PlaySlideshow) {
         slideshowHistory.reset();

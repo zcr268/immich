@@ -37,22 +37,33 @@ function currentUrlWithoutAsset() {
 
 export function currentUrlReplaceAssetId(assetId: string) {
   const $page = get(page);
+  const params = new URLSearchParams($page.url.search);
+  // always remove the assetGridScrollTargetParams
+  params.delete('asset');
+  params.delete('date');
+
   // this contains special casing for the /photos/:assetId photos route, which hangs directly
   // off / instead of a subpath, unlike every other asset-containing route.
   return isPhotosRoute($page.route.id)
-    ? `${AppRoute.PHOTOS}/${assetId}${$page.url.search}`
-    : `${$page.url.pathname.replace(/(\/photos.*)$/, '')}/photos/${assetId}${$page.url.search}`;
+    ? `${AppRoute.PHOTOS}/${assetId}${params.toString()}`
+    : `${$page.url.pathname.replace(/(\/photos.*)$/, '')}/photos/${assetId}${params.toString()}`;
 }
 
 function replaceScrollTarget(url: string, assetGridScrollTarget: AssetGridScrollTarget) {
   const $page = get(page);
   const parsed = new URL(url, $page.url);
-  if (assetGridScrollTarget === null || assetGridScrollTarget === undefined) {
+
+  const { assetId, date } = assetGridScrollTarget;
+
+  if (!assetId && !date) {
     return parsed.pathname;
   }
+
   const params = new URLSearchParams($page.url.search);
-  debugger;
-  params.set('asset', assetGridScrollTarget);
+
+  assetId ? params.set('asset', assetId) : void 0;
+  date ? params.set('date', date) : void 0;
+
   return parsed.pathname + '?' + params.toString();
 }
 
@@ -81,6 +92,14 @@ interface AssetGridRoute extends Route {
 
 type ImmichRoute = AssetRoute | AssetGridRoute;
 
+type NavOptions = {
+  replaceState?: boolean | undefined;
+  noScroll?: boolean | undefined;
+  keepFocus?: boolean | undefined;
+  invalidateAll?: boolean | undefined;
+  state?: App.PageState | undefined;
+};
+
 function isAssetRoute(route: Route): route is AssetRoute {
   return route.targetRoute === 'current' && 'assetId' in route;
 }
@@ -89,30 +108,32 @@ function isAssetGridRoute(route: Route): route is AssetGridRoute {
   return route.targetRoute === 'current' && 'assetId' in route && 'assetGridScrollTarget' in route;
 }
 
-async function navigateAssetRoute(route: AssetRoute) {
+async function navigateAssetRoute(route: AssetRoute, options?: NavOptions) {
   const { assetId } = route;
   const next = assetId ? currentUrlReplaceAssetId(assetId) : currentUrlWithoutAsset();
   const current = currentUrl();
   if (next !== current) {
-    await goto(next, { replaceState: false });
+    console.log('@@@NAV!', next);
+    await goto(next, options);
   }
 }
 
-async function navigateAssetGridRoute(route: AssetGridRoute) {
+async function navigateAssetGridRoute(route: AssetGridRoute, options?: NavOptions) {
   const { assetId, assetGridScrollTarget } = route;
   const assetUrl = assetId ? currentUrlReplaceAssetId(assetId) : currentUrlWithoutAsset();
   const next = replaceScrollTarget(assetUrl, assetGridScrollTarget);
   const current = currentUrl();
   if (next !== current) {
-    await goto(next, { replaceState: true, noScroll: true, keepFocus: true });
+    console.log('@@@NAV2', next);
+    await goto(next, options);
   }
 }
 
-export function navigate(change: ImmichRoute): Promise<void> {
+export function navigate(change: ImmichRoute, options?: NavOptions): Promise<void> {
   if (isAssetGridRoute(change)) {
-    return navigateAssetGridRoute(change);
+    return navigateAssetGridRoute(change, options);
   } else if (isAssetRoute(change)) {
-    return navigateAssetRoute(change);
+    return navigateAssetRoute(change, options);
   }
   // future navigation requests here
   throw `Invalid navigation: ${JSON.stringify(change)}`;

@@ -20,6 +20,8 @@
   import { fly } from 'svelte/transition';
   import Thumbnail from '../assets/thumbnail/thumbnail.svelte';
   import { handlePromiseError } from '$lib/utils';
+  import { goto } from '$app/navigation';
+  import { navigate } from '$lib/utils/navigation';
 
   export let element: HTMLElement | undefined = undefined;
   export let assets: AssetResponseDto[];
@@ -208,6 +210,9 @@
       }
     }
   }
+  $: {
+    console.log('pending id', $assetStore.pendingScrollAssetId);
+  }
 
   function scrollTimeline(heightDelta: number) {
     dispatch('shift', {
@@ -299,6 +304,7 @@
       >
         {#each groupAssets as asset, index (asset.id)}
           {@const box = geometry[groupIndex].boxes[index]}
+
           <div
             data-gridrow-top={geometry[groupIndex].gridHeights[geometry[groupIndex].boxes[index].gridrow]}
             class="absolute"
@@ -314,6 +320,7 @@
               on:intersected={() => {
                 // debugger;
                 console.log('cool', asset.id);
+                debugger;
                 onAssetInGrid(asset);
               }}
               on:hidden={() => {
@@ -324,20 +331,21 @@
               <Thumbnail
                 root={something}
                 {bottom}
-                scrollTarget={$assetStore.pendingScrollAssetId === asset.id}
+                {assetStore}
                 showStackedIcon={withStacked}
                 {showArchiveIcon}
                 {asset}
                 {groupIndex}
                 onScrollTarget={scrollToThumbnail}
                 onClick={(asset, event) => {
+                  event.preventDefault();
                   if (isSelectionMode || $isMultiSelectState) {
-                    event.preventDefault();
                     assetSelectHandler(asset, groupAssets, groupTitle);
                     return;
                   }
-
-                  assetViewingStore.setAsset(asset);
+                  debugger;
+                  void navigate({ targetRoute: 'current', assetId: asset.id });
+                  // assetViewingStore.setAsset(asset);
                 }}
                 on:select={() => assetSelectHandler(asset, groupAssets, groupTitle)}
                 on:mouse-event={() => assetMouseEventHandler(groupTitle, asset)}

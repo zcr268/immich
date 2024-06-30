@@ -10,16 +10,21 @@
   // route contains the assetId path.
   $: {
     if ($page.data.asset) {
+      console.log('layout - showing viewer');
       setAsset($page.data.asset);
     } else {
+      console.log('closing viewer');
       $showAssetViewer = false;
     }
+    const asset = $page.url.searchParams.get('asset');
+    const date = $page.url.searchParams.get('date');
+    setGridScrollTarget({ assetId: asset, date });
   }
-  $: {
-    if ($page.url.searchParams.has('asset')) {
-      handlePromiseError(setGridScrollTarget($page.url.searchParams.get('asset')));
-    }
-  }
+  // $: {
+  //   const asset = $page.url.searchParams.get('asset');
+  //   const date = $page.url.searchParams.get('date');
+  //   handlePromiseError(setGridScrollTarget({ assetId: asset, date }));
+  // }
 </script>
 
 <div class:display-none={$showAssetViewer}>
