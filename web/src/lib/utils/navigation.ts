@@ -1,10 +1,14 @@
 import { goto } from '$app/navigation';
 import { page } from '$app/stores';
-import { AppRoute } from '$lib/constants';
+import { AppRoute, QueryParameter } from '$lib/constants';
 import { getAssetInfo } from '@immich/sdk';
 import type { NavigationTarget } from '@sveltejs/kit';
 import { get } from 'svelte/store';
 
+export type AssetGridScrollTarget = {
+  assetId: string | null | undefined;
+  date: string | null | undefined;
+};
 export const isExternalUrl = (url: string): boolean => {
   return new URL(url, window.location.href).origin !== window.location.origin;
 };
@@ -40,12 +44,16 @@ export function currentUrlReplaceAssetId(assetId: string) {
     : `${$page.url.pathname.replace(/(\/photos.*)$/, '')}/photos/${assetId}${$page.url.search}`;
 }
 
-function replaceScrollTarget(url: string, assetGridScrollTarget: string | null | undefined) {
-  const parsed = new URL(url, get(page).url);
+function replaceScrollTarget(url: string, assetGridScrollTarget: AssetGridScrollTarget) {
+  const $page = get(page);
+  const parsed = new URL(url, $page.url);
   if (assetGridScrollTarget === null || assetGridScrollTarget === undefined) {
     return parsed.pathname;
   }
-  return parsed.pathname + '#' + assetGridScrollTarget;
+  const params = new URLSearchParams($page.url.search);
+  debugger;
+  params.set('asset', assetGridScrollTarget);
+  return parsed.pathname + '?' + params.toString();
 }
 
 function currentUrl() {
@@ -68,7 +76,7 @@ interface AssetRoute extends Route {
 interface AssetGridRoute extends Route {
   targetRoute: 'current';
   assetId: string | null | undefined;
-  assetGridScrollTarget: string | null | undefined;
+  assetGridScrollTarget: AssetGridScrollTarget;
 }
 
 type ImmichRoute = AssetRoute | AssetGridRoute;
@@ -84,7 +92,8 @@ function isAssetGridRoute(route: Route): route is AssetGridRoute {
 async function navigateAssetRoute(route: AssetRoute) {
   const { assetId } = route;
   const next = assetId ? currentUrlReplaceAssetId(assetId) : currentUrlWithoutAsset();
-  if (next !== currentUrl()) {
+  const current = currentUrl();
+  if (next !== current) {
     await goto(next, { replaceState: false });
   }
 }
@@ -93,7 +102,8 @@ async function navigateAssetGridRoute(route: AssetGridRoute) {
   const { assetId, assetGridScrollTarget } = route;
   const assetUrl = assetId ? currentUrlReplaceAssetId(assetId) : currentUrlWithoutAsset();
   const next = replaceScrollTarget(assetUrl, assetGridScrollTarget);
-  if (next !== currentUrl()) {
+  const current = currentUrl();
+  if (next !== current) {
     await goto(next, { replaceState: true, noScroll: true, keepFocus: true });
   }
 }

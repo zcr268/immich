@@ -3,11 +3,12 @@
   import { createEventDispatcher, onMount } from 'svelte';
 
   export let once = false;
-  export let top = 0;
-  export let bottom = 0;
-  export let left = 0;
-  export let right = 0;
+  export let top = '0px';
+  export let bottom = '0px';
+  export let left = '0px';
+  export let right = '0px';
   export let root: HTMLElement | null = null;
+  export let data: string | null = null;
 
   export let intersecting = false;
   let container: HTMLDivElement;
@@ -21,23 +22,25 @@
 
   onMount(() => {
     if (typeof IntersectionObserver !== 'undefined') {
-      const rootMargin = `${top}px ${right}px ${bottom}px ${left}px`;
+      const rootMargin = `${top} ${right} ${bottom} ${left}`;
+
       const observer = new IntersectionObserver(
         (entries) => {
+          const intersectingEntry = entries.find((entry) => entry.isIntersecting);
           intersecting = entries.some((entry) => entry.isIntersecting);
-          if (!intersecting) {
+          if (!intersectingEntry) {
             dispatch('hidden', container);
           }
 
-          if (intersecting && once) {
+          if (intersectingEntry && once) {
             observer.unobserve(container);
           }
 
-          if (intersecting) {
+          if (intersectingEntry) {
             let position: BucketPosition = BucketPosition.Visible;
-            if (entries[0].boundingClientRect.top + 50 > entries[0].intersectionRect.bottom) {
+            if (intersectingEntry.boundingClientRect.top + 50 > intersectingEntry.intersectionRect.bottom) {
               position = BucketPosition.Below;
-            } else if (entries[0].boundingClientRect.bottom < 0) {
+            } else if (intersectingEntry.boundingClientRect.bottom < 0) {
               position = BucketPosition.Above;
             }
 

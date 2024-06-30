@@ -265,8 +265,6 @@
                       title="Unassigned"
                       widthStyle="90px"
                       heightStyle="90px"
-                      thumbhash={null}
-                      hidden={false}
                     />
                   {:then data}
                     <ImageThumbnail
@@ -277,8 +275,6 @@
                       title="Unassigned"
                       widthStyle="90px"
                       heightStyle="90px"
-                      thumbhash={null}
-                      hidden={false}
                     />
                   {/await}
                 {/if}

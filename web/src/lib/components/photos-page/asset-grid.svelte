@@ -16,7 +16,7 @@
   import { deleteAssets } from '$lib/utils/actions';
   import { type ShortcutOptions, shortcuts } from '$lib/actions/shortcut';
   import { formatGroupTitle, splitBucketIntoDateGroups } from '$lib/utils/timeline-util';
-  import type { AlbumResponseDto, AssetResponseDto } from '@immich/sdk';
+  import type { AlbumResponseDto, AssetIdsResponseDto, AssetResponseDto } from '@immich/sdk';
   import { DateTime } from 'luxon';
   import { createEventDispatcher, onDestroy, onMount } from 'svelte';
   import IntersectionObserver from '../asset-viewer/intersection-observer.svelte';
@@ -29,7 +29,7 @@
   import { handlePromiseError } from '$lib/utils';
   import { selectAllAssets } from '$lib/utils/asset-utils';
   import { navigate } from '$lib/utils/navigation';
-  import { throttle } from 'lodash-es';
+  import { debounce, throttle } from 'lodash-es';
 
   export let isSelectionMode = false;
   export let singleSelect = false;
@@ -64,6 +64,7 @@
   let showSkeleton = true;
   let assetGroupCmp: AssetDateGroup[] = [];
   let internalScroll = false;
+  let something;
 
   $: timelineY = element?.scrollTop || 0;
   $: isEmpty = $assetStore.initialized && $assetStore.buckets.length === 0;
@@ -82,17 +83,19 @@
   const dispatch = createEventDispatcher<{ select: AssetResponseDto; escape: void }>();
 
   beforeNavigate(({ type, from, to, complete }) => {
-    const { id: currentRoute } = from?.route || { id: undefined };
-    const { id: nextRoute } = to?.route || { id: undefined };
-    if (type !== 'link' && type !== 'goto') {
-      return;
-    }
-    if (currentRoute && currentRoute !== nextRoute) {
-      complete.then(
-        () => setGridScrollTarget(null),
-        () => void 0,
-      );
-    }
+    console.log(type, from, to, complete);
+    // const { id: currentRoute } = from?.route || { id: undefined };
+    // const { id: nextRoute } = to?.route || { id: undefined };
+    // if (type !== 'link' && type !== 'goto') {
+    //   return;
+    // }
+    // if (currentRoute && currentRoute !== nextRoute) {
+    //   console.log('Canceling stuff');
+    //   complete.then(
+    //     () => setGridScrollTarget(null),
+    //     () => void 0,
+    //   );
+    // }
   });
 
   onMount(async () => {
@@ -119,18 +122,29 @@
     assetStore.disconnect();
   });
 
+  const updateScrollPos = ({ detail }) => {
+    element.scrollTop = detail;
+  };
+  const updateScrollPositon = debounce(updateScrollPos);
+
   const updateScroll = async () => {
+    // console.log('a');
     const buckets = $assetStore.buckets;
     if (internalScroll) {
       internalScroll = false;
       return;
     }
+    // console.log('b');
+    const t0 = performance.now();
 
     const top = -(timelineElement.getBoundingClientRect().top - NAVBAR_HEIGHT);
     if (top < 0) {
       return;
     }
     let prev_bucket_height = 0;
+    const buck = $assetStore.getBucketIndexByAssetId('372cb80b-ccc3-4999-b2be-24876b08c60a');
+    buck === buck;
+    // debugger;
     for (const [i, bucket] of buckets.entries()) {
       const cur_bucket_height = prev_bucket_height + bucket.bucketHeight;
       if (top >= prev_bucket_height && top < cur_bucket_height) {
@@ -140,16 +154,26 @@
         }
         const asset = group.findAssetAtTopLeftPosition(top - prev_bucket_height);
         if (asset) {
+          const t1 = performance.now();
+
+          // console.log(`Call to doSomething took ${t1 - t0} milliseconds.`);
           await setGridScrollTarget(asset.id);
           return;
         }
+      } else {
       }
       prev_bucket_height = cur_bucket_height;
     }
     await setGridScrollTarget(null);
   };
 
-  const updateScrollTarget = throttle(updateScroll, 50);
+  const onAssetInGrid = async (asset: AssetResponseDto) => {
+    await setGridScrollTarget(asset.id);
+  };
+
+  // const updateScrollTarget = debounce(updateScroll, 1);
+  // const updateScrollTarget = updateScroll;
+  const updateScrollTarget = () => void 0;
 
   const scrollToTarget = ({ target, offset }: { target: AssetBucket; offset: number }) => {
     const buckets = $assetStore.buckets;
@@ -258,6 +282,7 @@
   }
 
   function handleScrollTimeline(event: CustomEvent) {
+    console.log('shitf=');
     element.scrollBy(0, event.detail.heightDelta);
   }
 
@@ -320,19 +345,11 @@
     }
   };
 
-  let animationTick = false;
-
-  const handleTimelineScroll = () => {
-    if (animationTick) {
-      return;
-    }
-
-    animationTick = true;
-    window.requestAnimationFrame(() => {
-      timelineY = element?.scrollTop || 0;
-      animationTick = false;
-    });
+  const scrollTimelineY = () => {
+    timelineY = element?.scrollTop || 0;
   };
+
+  const handleTimelineScroll = debounce(scrollTimelineY);
 
   let lastAssetMouseEvent: AssetResponseDto | null = null;
 
@@ -520,7 +537,7 @@
   {assetStore}
   height={viewport.height}
   {timelineY}
-  on:scrollTimeline={({ detail }) => ((element.scrollTop = detail), void updateScrollTarget())}
+  on:scrollTimeline={updateScrollPositon}
 />
 
 <!-- Right margin MUST be equal to the width of immich-scrubbable-scrollbar -->
@@ -565,14 +582,16 @@
           on:intersected={intersectedHandler}
           on:hidden={() => bucket.cancel()}
           let:intersecting
-          top={750}
-          bottom={750}
+          top={'750px'}
+          bottom={'750px'}
           root={element}
         >
           {@const showGroup = intersecting || bucket === $assetStore.pendingScrollBucket}
           <div id={'bucket_' + bucket.bucketDate} style:height={bucket.bucketHeight + 'px'}>
             {#if showGroup}
               <AssetDateGroup
+                something={element}
+                bottom={'1000px'}
                 bind:this={assetGroupCmp[index]}
                 {withStacked}
                 {showArchiveIcon}
@@ -585,6 +604,7 @@
                 on:selectAssetCandidates={({ detail: asset }) => handleSelectAssetCandidates(asset)}
                 on:selectAssets={({ detail: asset }) => handleSelectAssets(asset)}
                 onScrollTarget={scrollToTarget}
+                {onAssetInGrid}
                 assets={bucket.assets}
                 bucketDate={bucket.bucketDate}
                 bucketHeight={bucket.bucketHeight}
@@ -630,5 +650,13 @@
   #skeleton {
     visibility: hidden;
     animation: 0s linear 0.3s forwards delayedVisibility;
+  }
+  #test {
+    background: blue;
+    position: absolute;
+    top: 10px;
+    width: 100%;
+    height: 100px;
+    z-index: 100;
   }
 </style>

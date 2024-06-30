@@ -41,6 +41,8 @@
   export let showArchiveIcon = false;
   export let showStackedIcon = true;
   export let scrollTarget = false;
+  export let root: HTMLElement | undefined = undefined;
+  export let bottom: string | undefined = undefined;
 
   export let onClick: ((asset: AssetResponseDto, event: Event) => void) | undefined = undefined;
   export let onScrollTarget: ((scrollTargetElement: HTMLElement) => void) | undefined = undefined;
@@ -99,9 +101,13 @@
   const onMouseLeave = () => {
     mouseOver = false;
   };
+  // $: {
+  //   const height = document.querySelector('#asset-grid')?.getBoundingClientRect().height;
+  //   console.log(height);
+  // }
 </script>
 
-<IntersectionObserver once={false} on:intersected let:intersecting>
+<IntersectionObserver {root} {bottom} data={asset.id} once={false} on:intersected let:intersecting>
   <a
     bind:this={thumbnailElement}
     href={currentUrlReplaceAssetId(asset.id)}
@@ -197,6 +203,7 @@
         {#if asset.resized}
           <ImageThumbnail
             url={getAssetThumbnailUrl({ id: asset.id, size: AssetMediaSize.Thumbnail, checksum: asset.checksum })}
+            extra={asset}
             altText={getAltText(asset)}
             widthStyle="{width}px"
             heightStyle="{height}px"

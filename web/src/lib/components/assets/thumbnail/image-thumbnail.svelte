@@ -1,3 +1,7 @@
+<script context="module">
+  const cache = {};
+</script>
+
 <script lang="ts">
   import { onMount, tick } from 'svelte';
   import { fade } from 'svelte/transition';
@@ -20,14 +24,32 @@
   export let border = false;
   export let preload = true;
   export let eyeColor: 'black' | 'white' = 'white';
+  export let extra = undefined;
+
+  let duration: number = 300;
 
   let complete = false;
   let img: HTMLImageElement;
 
+  $: {
+    if (url) {
+      if (cache[url]) {
+        // console.log('FOUND');
+      }
+      cache[url] = thumbhash;
+    }
+  }
   onMount(async () => {
-    await img.decode();
-    await tick();
-    complete = true;
+    try {
+      const time = Date.now();
+      await img.decode();
+      const time2 = Date.now();
+      // console.log('ms', time2 - time);
+      if (time2 - time < 50) {
+        duration = 0;
+      }
+      complete = true;
+    } catch {}
   });
 </script>
 
@@ -70,6 +92,10 @@
     class:shadow-lg={shadow}
     class:rounded-full={circle}
     draggable="false"
-    out:fade={{ duration: 300 }}
+    out:fade={{ duration }}
   />
 {/if}
+
+<div class="absolute top-0 text-white">
+  {extra?.id}
+</div>

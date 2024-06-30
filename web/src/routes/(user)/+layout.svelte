@@ -16,8 +16,8 @@
     }
   }
   $: {
-    if ($page.url.hash) {
-      handlePromiseError(setGridScrollTarget($page.url.hash.slice(1)));
+    if ($page.url.searchParams.has('asset')) {
+      handlePromiseError(setGridScrollTarget($page.url.searchParams.get('asset')));
     }
   }
 </script>
