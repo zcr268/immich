@@ -148,7 +148,7 @@
     if (navigating) {
       return;
     }
-    $gridScrollTarget = { at: asset.id, date: null };
+    $gridScrollTarget = { at: asset.id };
     internalScroll = true;
     await navigate(
       { targetRoute: 'current', assetId: null, assetGridRouteSearchParams: $gridScrollTarget },
@@ -167,8 +167,6 @@
       }
       bucket.position = BucketPosition.Above;
     }
-    console.log('scrolling');
-    debugger;
     internalScroll = true;
     element.scrollTo({ top: offset });
     $assetStore.clearPendingScroll();
@@ -290,7 +288,7 @@
   const handleClose = async ({ detail: { asset } }: { detail: { asset: AssetResponseDto } }) => {
     showSkeleton = true;
     assetViewingStore.showAssetViewer(false);
-    $gridScrollTarget = { at: asset.id, date: null };
+    $gridScrollTarget = { at: asset.id };
     await navigate({ targetRoute: 'current', assetId: null, assetGridRouteSearchParams: $gridScrollTarget });
   };
 

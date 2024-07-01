@@ -9,7 +9,6 @@ export const ssr = false;
 export const csr = true;
 
 export const load = (async () => {
-  console.log('LOAD');
   const authenticated = await loadUser();
   if (authenticated) {
     redirect(302, AppRoute.PHOTOS);

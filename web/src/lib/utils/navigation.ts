@@ -100,7 +100,7 @@ function isAssetRoute(route: Route): route is AssetRoute {
 }
 
 function isAssetGridRoute(route: Route): route is AssetGridRoute {
-  return route.targetRoute === 'current' && 'assetId' in route && 'assetGridScrollTarget' in route;
+  return route.targetRoute === 'current' && 'assetId' in route && 'assetGridRouteSearchParams' in route;
 }
 
 async function navigateAssetRoute(route: AssetRoute, options?: NavOptions) {

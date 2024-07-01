@@ -296,7 +296,6 @@ export class AssetStore {
   async loadBucket(bucketDate: string, position: BucketPosition, preventCancel?: boolean): Promise<void> {
     const bucket = this.getBucketByDate(bucketDate);
     if (!bucket) {
-      console.log('BAD!');
       return;
     }
     if (bucket.position === BucketPosition.Unknown) {
@@ -466,18 +465,12 @@ export class AssetStore {
     await this.complete;
 
     try {
-      const { at: assetId, date } = scrollTarget;
+      const { at: assetId } = scrollTarget;
       if (assetId) {
         const bucket = await this.findBucketForAssetId(assetId);
         if (bucket) {
           this.pendingScrollBucket = bucket;
           this.pendingScrollAssetId = assetId;
-          this.emit(false);
-        }
-      } else if (date) {
-        const bucket = this.getBucketByDate(date);
-        if (bucket) {
-          this.pendingScrollBucket = bucket;
           this.emit(false);
         }
       }

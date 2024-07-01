@@ -13,8 +13,7 @@
       $showAssetViewer = false;
     }
     const asset = $page.url.searchParams.get('asset');
-    const date = $page.url.searchParams.get('date');
-    $gridScrollTarget = { at: asset, date };
+    $gridScrollTarget = { at: asset };
   }
 </script>
 

@@ -56,7 +56,6 @@
   let mouseOver = false;
 
   $: {
-    // console.log(asset.id);
     if ($assetStore?.pendingScrollAssetId === asset.id && thumbnailElement) {
       onScrollTarget?.(thumbnailElement);
     }
@@ -104,10 +103,6 @@
   const onMouseLeave = () => {
     mouseOver = false;
   };
-  // $: {
-  //   const height = document.querySelector('#asset-grid')?.getBoundingClientRect().height;
-  //   console.log(height);
-  // }
 </script>
 
 <IntersectionObserver {root} {bottom} {top} once={false} on:intersected let:intersecting>
@@ -126,7 +121,6 @@
     on:click={handleClick}
   >
     {#if intersecting}
-      {console.log('showing', asset.id)}
       <div class="absolute z-20 {className}" style:width="{width}px" style:height="{height}px">
         <!-- Select asset button  -->
         {#if !readonly && (mouseOver || selected || selectionCandidate)}
