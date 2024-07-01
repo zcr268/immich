@@ -1,5 +1,6 @@
 <script lang="ts">
   import { afterNavigate, beforeNavigate, goto } from '$app/navigation';
+  import { resizeObserver } from '$lib/actions/resize-observer';
   import { AppRoute, AssetAction } from '$lib/constants';
   import type { AssetInteractionStore } from '$lib/stores/asset-interaction.store';
   import { assetViewingStore } from '$lib/stores/asset-viewing.store';
@@ -515,8 +516,7 @@
   id="asset-grid"
   class="scrollbar-hidden h-full overflow-y-auto outline-none pb-[60px] {isEmpty ? 'm-0' : 'ml-4 tall:ml-0 mr-[60px]'}"
   tabindex="-1"
-  bind:clientHeight={viewport.height}
-  bind:clientWidth={viewport.width}
+  use:resizeObserver={(element) => ((viewport.width = element.clientWidth), (viewport.height = element.clientHeight))}
   bind:this={element}
   on:scroll={() => handleTimelineScroll()}
 >

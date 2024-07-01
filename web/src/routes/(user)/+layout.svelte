@@ -12,7 +12,7 @@
     } else {
       $showAssetViewer = false;
     }
-    const asset = $page.url.searchParams.get('asset');
+    const asset = $page.url.searchParams.get('at');
     $gridScrollTarget = { at: asset };
   }
 </script>

@@ -22,6 +22,7 @@
   import { handlePromiseError } from '$lib/utils';
 
   import { navigate } from '$lib/utils/navigation';
+  import { resizeObserver } from '$lib/actions/resize-observer';
 
   export let element: HTMLElement | undefined = undefined;
   export let assets: AssetResponseDto[];
@@ -146,11 +147,12 @@
   };
 </script>
 
+<!--   -->
 <section
   id="asset-group-by-date"
   class="flex flex-wrap gap-x-12"
   data-bucket-date={bucketDate}
-  bind:clientHeight={actualBucketHeight}
+  use:resizeObserver={(element) => (actualBucketHeight = element.clientHeight)}
   bind:this={element}
 >
   {#each assetsGroupByDate as groupAssets, groupIndex (groupAssets[0].id)}
