@@ -459,7 +459,6 @@ export class AssetStore {
 
   /* Must be paired with matching clearPendingScroll() call */
   async scheduleScrollToAssetId(scrollTarget?: AssetGridRouteSearchParams | null) {
-    debugger;
     if (!scrollTarget) {
       return false;
     }
@@ -470,7 +469,6 @@ export class AssetStore {
       if (assetId) {
         const bucket = await this.findBucketForAssetId(assetId);
         if (bucket) {
-          debugger;
           this.pendingScrollBucket = bucket;
           this.pendingScrollAssetId = assetId;
           this.emit(false);
