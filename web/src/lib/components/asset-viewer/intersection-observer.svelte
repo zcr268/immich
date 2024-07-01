@@ -26,7 +26,7 @@
       const observer = new IntersectionObserver(
         (entries) => {
           const intersectingEntry = entries.find((entry) => entry.isIntersecting);
-          intersecting = entries.some((entry) => entry.isIntersecting);
+          intersecting = !!intersectingEntry;
           if (!intersectingEntry) {
             dispatch('hidden', container);
           }

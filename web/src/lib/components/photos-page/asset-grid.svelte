@@ -50,7 +50,6 @@
   let { isViewing: showAssetViewer, asset: viewingAsset, preloadAssets, gridScrollTarget } = assetViewingStore;
 
   let element: HTMLElement;
-  let timelineElement: HTMLElement;
   let showShortcuts = false;
   let showSkeleton = true;
   let assetGroupCmp: AssetDateGroup[] = [];
@@ -518,7 +517,7 @@
   tabindex="-1"
   use:resizeObserver={(element) => ((viewport.width = element.clientWidth), (viewport.height = element.clientHeight))}
   bind:this={element}
-  on:scroll={() => handleTimelineScroll()}
+  on:scroll={handleTimelineScroll}
 >
   <!-- skeleton -->
   {#if showSkeleton}
@@ -541,12 +540,7 @@
       {/if}
     </div>
 
-    <section
-      bind:this={timelineElement}
-      id="virtual-timeline"
-      class:invisible={showSkeleton}
-      style:height={$assetStore.timelineHeight + 'px'}
-    >
+    <section id="virtual-timeline" class:invisible={showSkeleton} style:height={$assetStore.timelineHeight + 'px'}>
       {#each $assetStore.buckets as bucket, index (bucket.bucketDate)}
         <IntersectionObserver
           on:intersected={intersectedHandler}

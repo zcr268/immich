@@ -147,7 +147,6 @@
   };
 </script>
 
-<!--   -->
 <section
   id="asset-group-by-date"
   class="flex flex-wrap gap-x-12"
@@ -204,7 +203,6 @@
       >
         {#each groupAssets as asset, index (asset.id)}
           {@const box = geometry[groupIndex].boxes[index]}
-
           <div
             class="absolute"
             style="width: {box.width}px; height: {box.height}px; top: {box.top}px; left: {box.left}px"
