@@ -17,10 +17,11 @@
   import { handleError } from '$lib/utils/handle-error';
   import { onDestroy, onMount } from 'svelte';
   import '../app.css';
+  import { isAssetViewerRoute, isSharedLinkRoute } from '$lib/utils/navigation';
+  import DialogWrapper from '$lib/components/shared-components/dialog/dialog-wrapper.svelte';
+  import { t } from 'svelte-i18n';
 
   let showNavigationLoadingBar = false;
-
-  const isSharedLinkRoute = (route: string | null) => route?.startsWith('/(user)/share/[key]');
 
   $: changeTheme($colorTheme);
 
@@ -62,7 +63,10 @@
     setKey($page.params.key);
   }
 
-  beforeNavigate(() => {
+  beforeNavigate(({ from, to }) => {
+    if (isAssetViewerRoute(from) && isAssetViewerRoute(to)) {
+      return;
+    }
     showNavigationLoadingBar = true;
   });
 
@@ -74,7 +78,7 @@
     try {
       await loadConfig();
     } catch (error) {
-      handleError(error, 'Unable to connect to server');
+      handleError(error, $t('errors.unable_to_connect_to_server'));
     }
   });
 </script>
@@ -105,7 +109,7 @@
 <noscript
   class="absolute z-[1000] flex h-screen w-screen place-content-center place-items-center bg-immich-bg dark:bg-immich-dark-bg dark:text-immich-dark-fg"
 >
-  <FullscreenContainer title="Welcome to Immich">
+  <FullscreenContainer title={$t('welcome_to_immich')}>
     To use Immich, you must enable JavaScript or use a JavaScript compatible browser.
   </FullscreenContainer>
 </noscript>
@@ -119,6 +123,7 @@
 <DownloadPanel />
 <UploadPanel />
 <NotificationList />
+<DialogWrapper />
 
 {#if $user?.isAdmin}
   <VersionAnnouncementBox />

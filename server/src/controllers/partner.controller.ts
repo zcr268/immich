@@ -7,25 +7,27 @@ import { Auth, Authenticated } from 'src/middleware/auth.guard';
 import { PartnerService } from 'src/services/partner.service';
 import { UUIDParamDto } from 'src/validation';
 
-@ApiTags('Partner')
-@Controller('partner')
-@Authenticated()
+@ApiTags('Partners')
+@Controller('partners')
 export class PartnerController {
   constructor(private service: PartnerService) {}
 
   @Get()
   @ApiQuery({ name: 'direction', type: 'string', enum: PartnerDirection, required: true })
+  @Authenticated()
   // TODO: remove 'direction' and convert to full query dto
   getPartners(@Auth() auth: AuthDto, @Query('direction') direction: PartnerDirection): Promise<PartnerResponseDto[]> {
     return this.service.getAll(auth, direction);
   }
 
   @Post(':id')
+  @Authenticated()
   createPartner(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto): Promise<PartnerResponseDto> {
     return this.service.create(auth, id);
   }
 
   @Put(':id')
+  @Authenticated()
   updatePartner(
     @Auth() auth: AuthDto,
     @Param() { id }: UUIDParamDto,
@@ -35,6 +37,7 @@ export class PartnerController {
   }
 
   @Delete(':id')
+  @Authenticated()
   removePartner(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto): Promise<void> {
     return this.service.remove(auth, id);
   }

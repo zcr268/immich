@@ -2,17 +2,19 @@ name: immich_mobile
 description: Immich - selfhosted backup media file on mobile phone
 
 publish_to: 'none'
-version: 1.101.0+131
+version: 1.106.4+144
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: '>=3.3.0 <4.0.0'
+  flutter: 3.22.2
 
 dependencies:
   flutter:
     sdk: flutter
 
   path_provider_ios:
-  # TODO: change to stable after 3.16 support
+  # TODO: upgrade to stable after 3.0.1 is released. 3.0.0 is broken
+  # https://github.com/fluttercandies/flutter_photo_manager/pull/990#issuecomment-2058066427
   photo_manager: ^3.0.0-dev.5
   photo_manager_image_provider: ^2.1.0
   flutter_hooks: ^0.20.4
@@ -20,17 +22,13 @@ dependencies:
   riverpod_annotation: ^2.3.3
   cached_network_image: ^3.3.1
   flutter_cache_manager: ^3.3.1
-  intl: ^0.18.0
-  auto_route: ^7.8.4
+  intl: ^0.19.0
+  auto_route: ^8.0.2
   fluttertoast: ^8.2.4
   video_player: ^2.8.2
   chewie: ^1.7.4
   socket_io_client: ^2.0.3+1
-  # TODO: Update it to tag once next stable release
-  maplibre_gl:
-    git:
-      url: https://github.com/maplibre/flutter-maplibre-gl.git
-      ref: acb428a005efd9832a0a8e7ef0945f899dfb3ca5
+  maplibre_gl: ^0.20.0
   geolocator: ^11.0.0 # used to move to current location in map view
   flutter_udid: ^3.0.0
   flutter_svg: ^2.0.9
@@ -85,9 +83,9 @@ dependency_overrides:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.1
+  flutter_lints: ^4.0.0
   build_runner: ^2.4.8
-  auto_route_generator: ^7.3.2
+  auto_route_generator: ^8.0.0
   flutter_launcher_icons: ^0.13.1
   flutter_native_splash: ^2.3.9
   isar_generator: ^3.1.0+1
@@ -104,9 +102,6 @@ flutter:
     - assets/
     - assets/i18n/
   fonts:
-    - family: SnowburstOne
-      fonts:
-        - asset: fonts/SnowburstOne.ttf
     - family: Inconsolata
       fonts:
         - asset: fonts/Inconsolata-Regular.ttf

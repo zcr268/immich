@@ -1,7 +1,8 @@
 import {
   Action,
   AssetBulkUploadCheckResult,
-  AssetFileUploadResponseDto,
+  AssetMediaResponseDto,
+  AssetMediaStatus,
   addAssetsToAlbum,
   checkBulkUpload,
   createAlbum,
@@ -14,7 +15,6 @@ import { Presets, SingleBar } from 'cli-progress';
 import { chunk } from 'lodash-es';
 import { Stats, createReadStream } from 'node:fs';
 import { stat, unlink } from 'node:fs/promises';
-import os from 'node:os';
 import path, { basename } from 'node:path';
 import { BaseOptions, authenticate, crawl, sha1 } from 'src/utils';
 
@@ -24,9 +24,9 @@ const s = (count: number) => (count === 1 ? '' : 's');
 type AssetBulkUploadCheckResults = Array<AssetBulkUploadCheckResult & { id: string }>;
 type Asset = { id: string; filepath: string };
 
-interface UploadOptionsDto {
+export interface UploadOptionsDto {
   recursive?: boolean;
-  exclusionPatterns?: string[];
+  ignore?: string;
   dryRun?: boolean;
   skipHash?: boolean;
   delete?: boolean;
@@ -75,7 +75,7 @@ const scan = async (pathsToCrawl: string[], options: UploadOptionsDto) => {
   const files = await crawl({
     pathsToCrawl,
     recursive: options.recursive,
-    exclusionPatterns: options.exclusionPatterns,
+    exclusionPattern: options.ignore,
     includeHidden: options.includeHidden,
     extensions: [...image, ...video],
   });
@@ -141,7 +141,7 @@ const uploadFiles = async (files: string[], { dryRun, concurrency }: UploadOptio
 
   if (dryRun) {
     console.log(`Would have uploaded ${files.length} asset${s(files.length)} (${byteSize(totalSize)})`);
-    return [];
+    return files.map((filepath) => ({ id: '', filepath }));
   }
 
   const uploadProgress = new SingleBar(
@@ -167,7 +167,7 @@ const uploadFiles = async (files: string[], { dryRun, concurrency }: UploadOptio
 
           newAssets.push({ id: response.id, filepath });
 
-          if (response.duplicate) {
+          if (response.status === AssetMediaStatus.Duplicate) {
             duplicateCount++;
             duplicateSize += stats.size ?? 0;
           } else {
@@ -192,7 +192,7 @@ const uploadFiles = async (files: string[], { dryRun, concurrency }: UploadOptio
   return newAssets;
 };
 
-const uploadFile = async (input: string, stats: Stats): Promise<AssetFileUploadResponseDto> => {
+const uploadFile = async (input: string, stats: Stats): Promise<AssetMediaResponseDto> => {
   const { baseUrl, headers } = defaults;
 
   const assetPath = path.parse(input);
@@ -225,7 +225,7 @@ const uploadFile = async (input: string, stats: Stats): Promise<AssetFileUploadR
     formData.append('sidecarData', sidecarData);
   }
 
-  const response = await fetch(`${baseUrl}/asset/upload`, {
+  const response = await fetch(`${baseUrl}/assets`, {
     method: 'post',
     redirect: 'error',
     headers: headers as Record<string, string>,
@@ -244,7 +244,7 @@ const deleteFiles = async (files: string[], options: UploadOptionsDto): Promise<
   }
 
   if (options.dryRun) {
-    console.log(`Would now have deleted assets, but skipped due to dry run`);
+    console.log(`Would have deleted ${files.length} local asset${s(files.length)}`);
     return;
   }
 
@@ -285,7 +285,7 @@ const updateAlbums = async (assets: Asset[], options: UploadOptionsDto) => {
   if (dryRun) {
     // TODO print asset counts for new albums
     console.log(`Would have created ${newAlbums.size} new album${s(newAlbums.size)}`);
-    console.log(`Would have updated ${assets.length} asset${s(assets.length)}`);
+    console.log(`Would have updated albums of ${assets.length} asset${s(assets.length)}`);
     return;
   }
 
@@ -345,7 +345,9 @@ const updateAlbums = async (assets: Asset[], options: UploadOptionsDto) => {
   }
 };
 
-const getAlbumName = (filepath: string, options: UploadOptionsDto) => {
-  const folderName = os.platform() === 'win32' ? filepath.split('\\').at(-2) : filepath.split('/').at(-2);
-  return options.albumName ?? folderName;
+// `filepath` valid format:
+// - Windows: `D:\\test\\Filename.txt` or `D:/test/Filename.txt`
+// - Unix: `/test/Filename.txt`
+export const getAlbumName = (filepath: string, options: UploadOptionsDto) => {
+  return options.albumName ?? path.basename(path.dirname(filepath));
 };

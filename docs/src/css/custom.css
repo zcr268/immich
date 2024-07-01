@@ -15,12 +15,16 @@ button {
   font-family: 'Overpass', sans-serif;
 }
 
+img {
+  border-radius: 15px;
+}
+
 /* You can override the default Infima variables here. */
 :root {
   --ifm-color-primary: #4250af;
   --ifm-color-primary-dark: #4250af;
-  --ifm-color-primary-darker: 4250af;
-  --ifm-color-primary-darkest: 4250af;
+  --ifm-color-primary-darker: #4250af;
+  --ifm-color-primary-darkest: #4250af;
   --ifm-color-primary-light: #4250af;
   --ifm-color-primary-lighter: #4250af;
   --ifm-color-primary-lightest: #4250af;
@@ -39,6 +43,10 @@ button {
   --ifm-color-primary-lightest: #ffffff;
   --ifm-background-color: #000000;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+}
+
+div[class^='announcementBar_'] {
+  min-height: 2rem;
 }
 
 .navbar__brand .navbar__title {

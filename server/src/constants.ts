@@ -1,20 +1,31 @@
 import { Duration } from 'luxon';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { Version } from 'src/utils/version';
+import { SemVer } from 'semver';
+
+export const POSTGRES_VERSION_RANGE = '>=14.0.0';
+export const VECTORS_VERSION_RANGE = '0.2.x';
+export const VECTOR_VERSION_RANGE = '>=0.5 <1';
+
+export const NEXT_RELEASE = 'NEXT_RELEASE';
+export const LIFECYCLE_EXTENSION = 'x-immich-lifecycle';
+export const DEPRECATED_IN_PREFIX = 'This property was deprecated in ';
+export const ADDED_IN_PREFIX = 'This property was added in ';
 
 export const SALT_ROUNDS = 10;
 
 const { version } = JSON.parse(readFileSync('./package.json', 'utf8'));
-export const serverVersion = Version.fromString(version);
+export const serverVersion = new SemVer(version);
 
 export const AUDIT_LOG_MAX_DURATION = Duration.fromObject({ days: 100 });
 export const ONE_HOUR = Duration.fromObject({ hours: 1 });
 
-export const envName = (process.env.NODE_ENV || 'development').toUpperCase();
-export const isDev = process.env.NODE_ENV === 'development';
+export const envName = (process.env.IMMICH_ENV || 'production').toUpperCase();
+export const isDev = () => process.env.IMMICH_ENV === 'development';
 export const APP_MEDIA_LOCATION = process.env.IMMICH_MEDIA_LOCATION || './upload';
 export const WEB_ROOT = process.env.IMMICH_WEB_ROOT || '/usr/src/app/www';
+const HOST_SERVER_PORT = process.env.IMMICH_PORT || '2283';
+export const DEFAULT_EXTERNAL_DOMAIN = 'http://localhost:' + HOST_SERVER_PORT;
 
 const GEODATA_ROOT_PATH = process.env.IMMICH_REVERSE_GEOCODING_ROOT || '/usr/src/resources';
 
@@ -26,12 +37,7 @@ export const geodataCities500Path = join(GEODATA_ROOT_PATH, citiesFile);
 
 export const MOBILE_REDIRECT = 'app.immich:/';
 export const LOGIN_URL = '/auth/login?autoLaunch=0';
-export const IMMICH_ACCESS_COOKIE = 'immich_access_token';
-export const IMMICH_IS_AUTHENTICATED = 'immich_is_authenticated';
-export const IMMICH_AUTH_TYPE_COOKIE = 'immich_auth_type';
-export const IMMICH_API_KEY_NAME = 'api_key';
-export const IMMICH_API_KEY_HEADER = 'x-api-key';
-export const IMMICH_SHARED_LINK_ACCESS_COOKIE = 'immich_shared_link_token';
+
 export enum AuthType {
   PASSWORD = 'password',
   OAUTH = 'oauth',

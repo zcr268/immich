@@ -1,3 +1,4 @@
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import _ from 'lodash';
 import { ChunkedArray, DummyValue, GenerateSql } from 'src/decorators';
@@ -13,12 +14,12 @@ import {
   PersonStatistics,
   UpdateFacesData,
 } from 'src/interfaces/person.interface';
-import { asVector } from 'src/utils/database';
 import { Instrumentation } from 'src/utils/instrumentation';
 import { Paginated, PaginationOptions, paginate } from 'src/utils/pagination';
 import { FindManyOptions, FindOptionsRelations, FindOptionsSelect, In, Repository } from 'typeorm';
 
 @Instrumentation()
+@Injectable()
 export class PersonRepository implements IPersonRepository {
   constructor(
     @InjectRepository(AssetEntity) private assetRepository: Repository<AssetEntity>,
@@ -101,6 +102,9 @@ export class PersonRepository implements IPersonRepository {
       where: { assetId },
       relations: {
         person: true,
+      },
+      order: {
+        boundingBoxX1: 'ASC',
       },
     });
   }
@@ -244,10 +248,8 @@ export class PersonRepository implements IPersonRepository {
   }
 
   async createFaces(entities: AssetFaceEntity[]): Promise<string[]> {
-    const res = await this.assetFaceRepository.insert(
-      entities.map((entity) => ({ ...entity, embedding: () => asVector(entity.embedding, true) })),
-    );
-    return res.identifiers.map((row) => row.id);
+    const res = await this.assetFaceRepository.save(entities);
+    return res.map((row) => row.id);
   }
 
   async update(entity: Partial<PersonEntity>): Promise<PersonEntity> {

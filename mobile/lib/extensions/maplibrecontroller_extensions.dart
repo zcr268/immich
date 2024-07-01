@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/services.dart';
-import 'package:immich_mobile/modules/map/models/map_marker.dart';
-import 'package:immich_mobile/modules/map/utils/map_utils.dart';
+import 'package:immich_mobile/models/map/map_marker.model.dart';
+import 'package:immich_mobile/utils/map_utils.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
-extension MapMarkers on MaplibreMapController {
+extension MapMarkers on MapLibreMapController {
   static var _completer = Completer()..complete();
 
   Future<void> addGeoJSONSourceForMarkers(List<MapMarker> markers) async {

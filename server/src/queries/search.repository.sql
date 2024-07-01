@@ -27,7 +27,6 @@ FROM
       "asset"."isFavorite" AS "asset_isFavorite",
       "asset"."isArchived" AS "asset_isArchived",
       "asset"."isExternal" AS "asset_isExternal",
-      "asset"."isReadOnly" AS "asset_isReadOnly",
       "asset"."isOffline" AS "asset_isOffline",
       "asset"."checksum" AS "asset_checksum",
       "asset"."duration" AS "asset_duration",
@@ -36,6 +35,7 @@ FROM
       "asset"."originalFileName" AS "asset_originalFileName",
       "asset"."sidecarPath" AS "asset_sidecarPath",
       "asset"."stackId" AS "asset_stackId",
+      "asset"."duplicateId" AS "asset_duplicateId",
       "stack"."id" AS "stack_id",
       "stack"."primaryAssetId" AS "stack_primaryAssetId",
       "stackedAssets"."id" AS "stackedAssets_id",
@@ -58,7 +58,6 @@ FROM
       "stackedAssets"."isFavorite" AS "stackedAssets_isFavorite",
       "stackedAssets"."isArchived" AS "stackedAssets_isArchived",
       "stackedAssets"."isExternal" AS "stackedAssets_isExternal",
-      "stackedAssets"."isReadOnly" AS "stackedAssets_isReadOnly",
       "stackedAssets"."isOffline" AS "stackedAssets_isOffline",
       "stackedAssets"."checksum" AS "stackedAssets_checksum",
       "stackedAssets"."duration" AS "stackedAssets_duration",
@@ -66,7 +65,8 @@ FROM
       "stackedAssets"."livePhotoVideoId" AS "stackedAssets_livePhotoVideoId",
       "stackedAssets"."originalFileName" AS "stackedAssets_originalFileName",
       "stackedAssets"."sidecarPath" AS "stackedAssets_sidecarPath",
-      "stackedAssets"."stackId" AS "stackedAssets_stackId"
+      "stackedAssets"."stackId" AS "stackedAssets_stackId",
+      "stackedAssets"."duplicateId" AS "stackedAssets_duplicateId"
     FROM
       "assets" "asset"
       LEFT JOIN "exif" "exifInfo" ON "exifInfo"."assetId" = "asset"."id"
@@ -123,7 +123,6 @@ SELECT
   "asset"."isFavorite" AS "asset_isFavorite",
   "asset"."isArchived" AS "asset_isArchived",
   "asset"."isExternal" AS "asset_isExternal",
-  "asset"."isReadOnly" AS "asset_isReadOnly",
   "asset"."isOffline" AS "asset_isOffline",
   "asset"."checksum" AS "asset_checksum",
   "asset"."duration" AS "asset_duration",
@@ -132,6 +131,7 @@ SELECT
   "asset"."originalFileName" AS "asset_originalFileName",
   "asset"."sidecarPath" AS "asset_sidecarPath",
   "asset"."stackId" AS "asset_stackId",
+  "asset"."duplicateId" AS "asset_duplicateId",
   "stack"."id" AS "stack_id",
   "stack"."primaryAssetId" AS "stack_primaryAssetId",
   "stackedAssets"."id" AS "stackedAssets_id",
@@ -154,7 +154,6 @@ SELECT
   "stackedAssets"."isFavorite" AS "stackedAssets_isFavorite",
   "stackedAssets"."isArchived" AS "stackedAssets_isArchived",
   "stackedAssets"."isExternal" AS "stackedAssets_isExternal",
-  "stackedAssets"."isReadOnly" AS "stackedAssets_isReadOnly",
   "stackedAssets"."isOffline" AS "stackedAssets_isOffline",
   "stackedAssets"."checksum" AS "stackedAssets_checksum",
   "stackedAssets"."duration" AS "stackedAssets_duration",
@@ -162,7 +161,8 @@ SELECT
   "stackedAssets"."livePhotoVideoId" AS "stackedAssets_livePhotoVideoId",
   "stackedAssets"."originalFileName" AS "stackedAssets_originalFileName",
   "stackedAssets"."sidecarPath" AS "stackedAssets_sidecarPath",
-  "stackedAssets"."stackId" AS "stackedAssets_stackId"
+  "stackedAssets"."stackId" AS "stackedAssets_stackId",
+  "stackedAssets"."duplicateId" AS "stackedAssets_duplicateId"
 FROM
   "assets" "asset"
   LEFT JOIN "exif" "exifInfo" ON "exifInfo"."assetId" = "asset"."id"
@@ -189,6 +189,36 @@ LIMIT
   101
 COMMIT
 
+-- SearchRepository.searchDuplicates
+WITH
+  "cte" AS (
+    SELECT
+      "asset"."duplicateId" AS "duplicateId",
+      "search"."assetId" AS "assetId",
+      "search"."embedding" <= > $1 AS "distance"
+    FROM
+      "assets" "asset"
+      INNER JOIN "smart_search" "search" ON "search"."assetId" = "asset"."id"
+    WHERE
+      (
+        "asset"."ownerId" IN ($2)
+        AND "asset"."id" != $3
+        AND "asset"."isVisible" = $4
+        AND "asset"."type" = $5
+      )
+      AND ("asset"."deletedAt" IS NULL)
+    ORDER BY
+      "search"."embedding" <= > $1 ASC
+    LIMIT
+      64
+  )
+SELECT
+  res.*
+FROM
+  "cte" "res"
+WHERE
+  res.distance <= $6
+
 -- SearchRepository.searchFaces
 START TRANSACTION
 SET
@@ -211,15 +241,16 @@ WITH
       "faces"."boundingBoxY1" AS "boundingBoxY1",
       "faces"."boundingBoxX2" AS "boundingBoxX2",
       "faces"."boundingBoxY2" AS "boundingBoxY2",
-      "faces"."embedding" <= > $1 AS "distance"
+      "search"."embedding" <= > $1 AS "distance"
     FROM
       "asset_faces" "faces"
       INNER JOIN "assets" "asset" ON "asset"."id" = "faces"."assetId"
       AND ("asset"."deletedAt" IS NULL)
+      INNER JOIN "face_search" "search" ON "search"."faceId" = "faces"."id"
     WHERE
       "asset"."ownerId" IN ($2)
     ORDER BY
-      "faces"."embedding" <= > $1 ASC
+      "search"."embedding" <= > $1 ASC
     LIMIT
       100
   )
@@ -333,7 +364,6 @@ SELECT
   "asset"."isFavorite" AS "asset_isFavorite",
   "asset"."isArchived" AS "asset_isArchived",
   "asset"."isExternal" AS "asset_isExternal",
-  "asset"."isReadOnly" AS "asset_isReadOnly",
   "asset"."isOffline" AS "asset_isOffline",
   "asset"."checksum" AS "asset_checksum",
   "asset"."duration" AS "asset_duration",
@@ -342,6 +372,7 @@ SELECT
   "asset"."originalFileName" AS "asset_originalFileName",
   "asset"."sidecarPath" AS "asset_sidecarPath",
   "asset"."stackId" AS "asset_stackId",
+  "asset"."duplicateId" AS "asset_duplicateId",
   "exif"."assetId" AS "exif_assetId",
   "exif"."description" AS "exif_description",
   "exif"."exifImageWidth" AS "exif_exifImageWidth",
@@ -374,3 +405,5 @@ FROM
   "assets" "asset"
   INNER JOIN "exif" "exif" ON "exif"."assetId" = "asset"."id"
   INNER JOIN cte ON asset.id = cte."assetId"
+ORDER BY
+  exif.city
