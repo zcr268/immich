@@ -1,5 +1,5 @@
 import { getKey } from '$lib/utils';
-import type { AssetGridScrollTarget } from '$lib/utils/navigation';
+import type { AssetGridRouteSearchParams } from '$lib/utils/navigation';
 import { fromLocalDateTime } from '$lib/utils/timeline-util';
 import { TimeBucketSize, getAssetInfo, getTimeBucket, getTimeBuckets, type AssetResponseDto } from '@immich/sdk';
 import { throttle } from 'lodash-es';
@@ -459,14 +459,14 @@ export class AssetStore {
   }
 
   /* Must be paired with matching clearPendingScroll() call */
-  async scheduleScrollToAssetId(scrollTarget?: AssetGridScrollTarget | null) {
+  async scheduleScrollToAssetId(scrollTarget?: AssetGridRouteSearchParams | null) {
     if (!scrollTarget) {
       return false;
     }
     await this.complete;
 
     try {
-      const { assetId, date } = scrollTarget;
+      const { at: assetId, date } = scrollTarget;
       if (assetId) {
         const bucket = await this.findBucketForAssetId(assetId);
         if (bucket) {

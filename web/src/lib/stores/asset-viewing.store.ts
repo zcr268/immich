@@ -1,5 +1,5 @@
 import { getKey } from '$lib/utils';
-import { type AssetGridScrollTarget } from '$lib/utils/navigation';
+import { type AssetGridRouteSearchParams } from '$lib/utils/navigation';
 import { getAssetInfo, type AssetResponseDto } from '@immich/sdk';
 import { writable } from 'svelte/store';
 
@@ -7,7 +7,7 @@ function createAssetViewingStore() {
   const viewingAssetStoreState = writable<AssetResponseDto>();
   const preloadAssets = writable<AssetResponseDto[]>([]);
   const viewState = writable<boolean>(false);
-  const gridScrollTarget = writable<AssetGridScrollTarget | null | undefined>();
+  const gridScrollTarget = writable<AssetGridRouteSearchParams | null | undefined>();
 
   const setAsset = (asset: AssetResponseDto, assetsToPreload: AssetResponseDto[] = []) => {
     preloadAssets.set(assetsToPreload);

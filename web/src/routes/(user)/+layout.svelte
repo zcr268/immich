@@ -14,7 +14,7 @@
     }
     const asset = $page.url.searchParams.get('asset');
     const date = $page.url.searchParams.get('date');
-    $gridScrollTarget = { assetId: asset, date };
+    $gridScrollTarget = { at: asset, date };
   }
 </script>
 

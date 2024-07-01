@@ -79,7 +79,7 @@
       return;
     }
     void $assetStore.scheduleScrollToAssetId($gridScrollTarget);
-    $gridScrollTarget?.assetId ? void 0 : (showSkeleton = false);
+    $gridScrollTarget?.at ? void 0 : (showSkeleton = false);
   };
 
   afterNavigate(({ complete }) => {
@@ -148,10 +148,10 @@
     if (navigating) {
       return;
     }
-    $gridScrollTarget = { assetId: asset.id, date: null };
+    $gridScrollTarget = { at: asset.id, date: null };
     internalScroll = true;
     await navigate(
-      { targetRoute: 'current', assetId: null, assetGridScrollTarget: $gridScrollTarget },
+      { targetRoute: 'current', assetId: null, assetGridRouteSearchParams: $gridScrollTarget },
       { replaceState: true },
     );
   };
@@ -290,8 +290,8 @@
   const handleClose = async ({ detail: { asset } }: { detail: { asset: AssetResponseDto } }) => {
     showSkeleton = true;
     assetViewingStore.showAssetViewer(false);
-    $gridScrollTarget = { assetId: asset.id, date: null };
-    await navigate({ targetRoute: 'current', assetId: null, assetGridScrollTarget: $gridScrollTarget });
+    $gridScrollTarget = { at: asset.id, date: null };
+    await navigate({ targetRoute: 'current', assetId: null, assetGridRouteSearchParams: $gridScrollTarget });
   };
 
   const handleAction = async (action: AssetAction, asset: AssetResponseDto) => {

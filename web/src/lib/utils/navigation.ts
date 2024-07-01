@@ -5,9 +5,8 @@ import { getAssetInfo } from '@immich/sdk';
 import type { NavigationTarget } from '@sveltejs/kit';
 import { get } from 'svelte/store';
 
-export type AssetGridScrollTarget = {
-  assetId: string | null | undefined;
-  date: string | null | undefined;
+export type AssetGridRouteSearchParams = {
+  at: string | null | undefined;
 };
 export const isExternalUrl = (url: string): boolean => {
   return new URL(url, window.location.href).origin !== window.location.origin;
@@ -39,31 +38,27 @@ export function currentUrlReplaceAssetId(assetId: string) {
   const $page = get(page);
   const params = new URLSearchParams($page.url.search);
   // always remove the assetGridScrollTargetParams
-  params.delete('asset');
-  params.delete('date');
-
+  params.delete('at');
+  const searchparams = params.size > 0 ? '?' + params.toString() : '';
   // this contains special casing for the /photos/:assetId photos route, which hangs directly
   // off / instead of a subpath, unlike every other asset-containing route.
   return isPhotosRoute($page.route.id)
-    ? `${AppRoute.PHOTOS}/${assetId}${params.toString()}`
-    : `${$page.url.pathname.replace(/(\/photos.*)$/, '')}/photos/${assetId}${params.toString()}`;
+    ? `${AppRoute.PHOTOS}/${assetId}${searchparams}`
+    : `${$page.url.pathname.replace(/(\/photos.*)$/, '')}/photos/${assetId}${searchparams}`;
 }
 
-function replaceScrollTarget(url: string, assetGridScrollTarget: AssetGridScrollTarget) {
+function replaceScrollTarget(url: string, searchParams: AssetGridRouteSearchParams) {
   const $page = get(page);
   const parsed = new URL(url, $page.url);
 
-  const { assetId, date } = assetGridScrollTarget;
+  const { at: assetId } = searchParams;
 
-  if (!assetId && !date) {
+  if (!assetId) {
     return parsed.pathname;
   }
 
   const params = new URLSearchParams($page.url.search);
-
-  assetId ? params.set('asset', assetId) : void 0;
-  date ? params.set('date', date) : void 0;
-
+  assetId ? params.set('at', assetId) : void 0;
   return parsed.pathname + '?' + params.toString();
 }
 
@@ -87,7 +82,7 @@ interface AssetRoute extends Route {
 interface AssetGridRoute extends Route {
   targetRoute: 'current';
   assetId: string | null | undefined;
-  assetGridScrollTarget: AssetGridScrollTarget;
+  assetGridRouteSearchParams: AssetGridRouteSearchParams;
 }
 
 type ImmichRoute = AssetRoute | AssetGridRoute;
@@ -118,7 +113,7 @@ async function navigateAssetRoute(route: AssetRoute, options?: NavOptions) {
 }
 
 async function navigateAssetGridRoute(route: AssetGridRoute, options?: NavOptions) {
-  const { assetId, assetGridScrollTarget } = route;
+  const { assetId, assetGridRouteSearchParams: assetGridScrollTarget } = route;
   const assetUrl = assetId ? currentUrlReplaceAssetId(assetId) : currentUrlWithoutAsset();
   const next = replaceScrollTarget(assetUrl, assetGridScrollTarget);
   const current = currentUrl();
