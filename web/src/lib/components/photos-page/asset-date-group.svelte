@@ -33,7 +33,8 @@
   export let withStacked = false;
   export let showArchiveIcon = false;
   export let assetGridElement: HTMLElement | undefined = undefined;
-  export let bottom: string | undefined = undefined;
+  export let renderThumbsAtBottomMargin: string | undefined = undefined;
+  export let renderThumbsAtTopMargin: string | undefined = undefined;
   export let assetStore: AssetStore;
   export let assetInteractionStore: AssetInteractionStore;
   export let onScrollTarget: (({ target, offset }: { target: AssetBucket; offset: number }) => void) | undefined =
@@ -216,7 +217,8 @@
             >
               <Thumbnail
                 root={assetGridElement}
-                {bottom}
+                bottom={renderThumbsAtBottomMargin}
+                top={renderThumbsAtTopMargin}
                 {assetStore}
                 showStackedIcon={withStacked}
                 {showArchiveIcon}

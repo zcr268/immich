@@ -43,6 +43,7 @@
   export let showStackedIcon = true;
   export let root: HTMLElement | undefined = undefined;
   export let bottom: string | undefined = undefined;
+  export let top: string | undefined = undefined;
 
   export let assetStore: AssetStore | undefined = undefined;
   export let onClick: ((asset: AssetResponseDto, event: Event) => void) | undefined = undefined;
@@ -109,7 +110,7 @@
   // }
 </script>
 
-<IntersectionObserver {root} {bottom} once={false} on:intersected let:intersecting>
+<IntersectionObserver {root} {bottom} {top} once={false} on:intersected let:intersecting>
   <a
     bind:this={thumbnailElement}
     href={currentUrlReplaceAssetId(asset.id)}
@@ -125,6 +126,7 @@
     on:click={handleClick}
   >
     {#if intersecting}
+      {console.log('showing', asset.id)}
       <div class="absolute z-20 {className}" style:width="{width}px" style:height="{height}px">
         <!-- Select asset button  -->
         {#if !readonly && (mouseOver || selected || selectionCandidate)}

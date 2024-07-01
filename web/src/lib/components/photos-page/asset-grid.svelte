@@ -41,8 +41,6 @@
   export let album: AlbumResponseDto | null = null;
   export let isShowDeleteConfirmation = false;
 
-  //TODO - calculate this
-
   $: isTrashEnabled = $featureFlags.loaded && $featureFlags.trash;
 
   const { assetSelectionCandidates, assetSelectionStart, selectedGroup, selectedAssets, isMultiSelectState } =
@@ -151,7 +149,7 @@
       return;
     }
     $gridScrollTarget = { assetId: asset.id, date: null };
-
+    internalScroll = true;
     await navigate(
       { targetRoute: 'current', assetId: null, assetGridScrollTarget: $gridScrollTarget },
       { replaceState: true },
@@ -169,6 +167,7 @@
       }
       bucket.position = BucketPosition.Above;
     }
+    console.log('scrolling');
     debugger;
     internalScroll = true;
     element.scrollTo({ top: offset });
@@ -555,8 +554,8 @@
           on:intersected={intersectedHandler}
           on:hidden={() => bucket.cancel()}
           let:intersecting
-          top={'750px'}
-          bottom={'750px'}
+          top={'200%'}
+          bottom={'200%'}
           root={element}
         >
           {@const showGroup = intersecting || bucket === $assetStore.pendingScrollBucket}
@@ -564,8 +563,9 @@
             {#if showGroup}
               <AssetDateGroup
                 assetGridElement={element}
-                bottom={'1000px'}
                 bind:this={assetGroupCmp[index]}
+                renderThumbsAtBottomMargin={'200%'}
+                renderThumbsAtTopMargin={'200%'}
                 {withStacked}
                 {showArchiveIcon}
                 {assetStore}
