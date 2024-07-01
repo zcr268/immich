@@ -1,9 +1,5 @@
-<script context="module">
-  const cache = {};
-</script>
-
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onMount } from 'svelte';
   import { fade } from 'svelte/transition';
   import { thumbHashToDataURL } from 'thumbhash';
   // eslint-disable-next-line unicorn/prefer-node-protocol
@@ -24,32 +20,24 @@
   export let border = false;
   export let preload = true;
   export let eyeColor: 'black' | 'white' = 'white';
-  export let extra = undefined;
 
   let duration: number = 300;
 
   let complete = false;
   let img: HTMLImageElement;
 
-  $: {
-    if (url) {
-      if (cache[url]) {
-        // console.log('FOUND');
-      }
-      cache[url] = thumbhash;
-    }
-  }
   onMount(async () => {
     try {
-      const time = Date.now();
+      const t1 = Date.now();
       await img.decode();
-      const time2 = Date.now();
-      // console.log('ms', time2 - time);
-      if (time2 - time < 50) {
+      const t2 = Date.now();
+      if (t2 - t1 < 50) {
         duration = 0;
       }
       complete = true;
-    } catch {}
+    } catch {
+      // ignore decoding errors
+    }
   });
 </script>
 
@@ -95,7 +83,3 @@
     out:fade={{ duration }}
   />
 {/if}
-
-<div class="absolute top-0 text-white">
-  {extra?.id}
-</div>

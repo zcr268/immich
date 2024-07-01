@@ -16,7 +16,7 @@
   import { deleteAssets } from '$lib/utils/actions';
   import { type ShortcutOptions, shortcuts } from '$lib/actions/shortcut';
   import { formatGroupTitle, splitBucketIntoDateGroups } from '$lib/utils/timeline-util';
-  import type { AlbumResponseDto, AssetIdsResponseDto, AssetResponseDto } from '@immich/sdk';
+  import type { AlbumResponseDto, AssetResponseDto } from '@immich/sdk';
   import { DateTime } from 'luxon';
   import { createEventDispatcher, onDestroy, onMount } from 'svelte';
   import IntersectionObserver from '../asset-viewer/intersection-observer.svelte';
@@ -29,7 +29,6 @@
   import { handlePromiseError } from '$lib/utils';
   import { selectAllAssets } from '$lib/utils/asset-utils';
   import { navigate } from '$lib/utils/navigation';
-  import { debounce, throttle } from 'lodash-es';
 
   export let isSelectionMode = false;
   export let singleSelect = false;
@@ -43,20 +42,13 @@
   export let isShowDeleteConfirmation = false;
 
   //TODO - calculate this
-  const NAVBAR_HEIGHT = 80.5;
 
   $: isTrashEnabled = $featureFlags.loaded && $featureFlags.trash;
 
   const { assetSelectionCandidates, assetSelectionStart, selectedGroup, selectedAssets, isMultiSelectState } =
     assetInteractionStore;
   const viewport: Viewport = { width: 0, height: 0 };
-  let {
-    isViewing: showAssetViewer,
-    asset: viewingAsset,
-    preloadAssets,
-    setGridScrollTarget,
-    gridScrollTarget,
-  } = assetViewingStore;
+  let { isViewing: showAssetViewer, asset: viewingAsset, preloadAssets, gridScrollTarget } = assetViewingStore;
 
   let element: HTMLElement;
   let timelineElement: HTMLElement;
@@ -64,7 +56,6 @@
   let showSkeleton = true;
   let assetGroupCmp: AssetDateGroup[] = [];
   let internalScroll = false;
-  let something;
 
   $: timelineY = element?.scrollTop || 0;
   $: isEmpty = $assetStore.initialized && $assetStore.buckets.length === 0;
@@ -83,142 +74,91 @@
   let navigating = false;
   const dispatch = createEventDispatcher<{ select: AssetResponseDto; escape: void }>();
 
-  afterNavigate((nav) => {
-    console.log('after-nav', nav);
-    nav.complete.then(
-      () => {
-        navigating = false;
-        console.log('!!!', $gridScrollTarget);
-        void assetStore.scheduleScrollToAssetId($gridScrollTarget);
-        if (!$gridScrollTarget?.assetId) {
-          showSkeleton = false;
-        }
-      },
-      () => (navigating = false),
-    );
-  });
-  beforeNavigate((nav) => {
-    navigating = true;
-    const { type, from, to, complete } = nav;
-    // debugger;
-    complete.then(
-      () => {
-        console.log(nav);
-        console.log('nav done', nav);
-      },
-      () => {
-        console.log('nav abort', nav);
-      },
-    );
-    // debugger;
-    // if (to && to.url && to.url.searchParams.has('asset')) {
-    //   console.log('Doing a scroll!');
-    //   // const assetGridScrollTarget = { assetId: to.url.searchParams.get('asset'), date: null };
-    //   // void setGridScrollTarget(assetGridScrollTarget);
-    //   // void assetStore.scheduleScrollToAssetId(assetGridScrollTarget);
-    // }
-    // const { id: currentRoute } = from?.route || { id: undefined };
-    // const { id: nextRoute } = to?.route || { id: undefined };
-    // if (type !== 'link' && type !== 'goto') {
-    //   return;
-    // }
-    // if (currentRoute && currentRoute !== nextRoute) {
-    //   console.log('Canceling stuff');
-    //   complete.then(
-    //     () => setGridScrollTarget(null),
-    //     () => void 0,
-    //   );
-    // }
-  });
-
-  onMount(async () => {
-    console.log('on-mount', $gridScrollTarget);
-    assetStore.connect();
-
-    await assetStore.init(viewport);
-    // if ($gridScrollTarget) {
-    //   const requested = await assetStore.scheduleScrollToAssetId($gridScrollTarget);
-    //   if (requested) {
-    //     return;
-    //   }
-    //   // hash invalid
-    //   // await setGridScrollTarget(null);
-    // }
-    // showSkeleton = false;
-  });
-
-  onDestroy(() => {
-    console.log('ASSET GRID IS DOWN');
-    if ($showAssetViewer) {
-      $showAssetViewer = false;
-    }
-
-    assetStore.disconnect();
-  });
-
-  const updateScrollPos = ({ detail }) => {
-    element.scrollTop = detail;
-  };
-  const updateScrollPositon = debounce(updateScrollPos);
-
-  const updateScroll = async () => {
-    // console.log('a');
-    const buckets = $assetStore.buckets;
+  const completeNav = () => {
+    navigating = false;
     if (internalScroll) {
       internalScroll = false;
       return;
     }
-    // console.log('b');
-    const t0 = performance.now();
-
-    const top = -(timelineElement.getBoundingClientRect().top - NAVBAR_HEIGHT);
-    if (top < 0) {
-      return;
-    }
-    let prev_bucket_height = 0;
-    const buck = $assetStore.getBucketIndexByAssetId('372cb80b-ccc3-4999-b2be-24876b08c60a');
-    buck === buck;
-    // debugger;
-    for (const [i, bucket] of buckets.entries()) {
-      const cur_bucket_height = prev_bucket_height + bucket.bucketHeight;
-      if (top >= prev_bucket_height && top < cur_bucket_height) {
-        const group = assetGroupCmp[i];
-        if (!group) {
-          continue;
-        }
-        const asset = group.findAssetAtTopLeftPosition(top - prev_bucket_height);
-        if (asset) {
-          const t1 = performance.now();
-
-          // console.log(`Call to doSomething took ${t1 - t0} milliseconds.`);
-          await setGridScrollTarget(asset.id);
-          return;
-        }
-      } else {
-      }
-      prev_bucket_height = cur_bucket_height;
-    }
-    await setGridScrollTarget(null);
+    void $assetStore.scheduleScrollToAssetId($gridScrollTarget);
+    $gridScrollTarget?.assetId ? void 0 : (showSkeleton = false);
   };
+
+  afterNavigate(({ complete }) => {
+    complete.then(completeNav, completeNav);
+  });
+
+  beforeNavigate(() => {
+    navigating = true;
+  });
+
+  if (import.meta.hot) {
+    // hmr will set the skeleton back to true by default, but there is no subsequent history
+    // load to complete the load, so the stencil stays during hmr
+    /* eslint-disable-next-line  unicorn/no-lonely-if */
+    if (import.meta.hot.data.id) {
+      showSkeleton = false;
+    }
+  }
+
+  onMount(async () => {
+    if ($assetStore.initialized) {
+      showSkeleton = false;
+    } else {
+      $assetStore.connect();
+      await $assetStore.init(viewport);
+    }
+  });
+
+  onDestroy(() => {
+    $assetStore.disconnect();
+  });
+
+  /* eslint-disable-next-line  @typescript-eslint/no-explicit-any */
+  function wrapRAF<T extends (...args: any) => any>(fn: T) {
+    let updating = false;
+    /* eslint-disable-next-line  @typescript-eslint/no-explicit-any */
+    return (...args: any) => {
+      if (updating) {
+        return;
+      }
+      updating = true;
+      requestAnimationFrame(() => {
+        fn.call(undefined, ...args);
+        updating = false;
+      });
+    };
+  }
+
+  const updateScrollPos = ({ detail }: { detail: number }) => {
+    element.scrollTop = detail;
+  };
+  const updateScrollPositon = wrapRAF(updateScrollPos);
+
+  const scrollTimelineY = () => {
+    timelineY = element?.scrollTop || 0;
+  };
+
+  const handleTimelineScroll = wrapRAF(scrollTimelineY);
+
+  function scrollTimeline(event: CustomEvent) {
+    element.scrollBy(0, event.detail.heightDelta);
+  }
+  const handleScrollTimeline = wrapRAF(scrollTimeline);
 
   const onAssetInGrid = async (asset: AssetResponseDto) => {
     if (navigating) {
-      debugger;
-      console.log('skipping nav');
       return;
     }
-    const assetGridScrollTarget = { assetId: asset.id, date: null };
-    await setGridScrollTarget(assetGridScrollTarget);
-    await navigate({ targetRoute: 'current', assetId: null, assetGridScrollTarget }, { replaceState: true });
+    $gridScrollTarget = { assetId: asset.id, date: null };
+
+    await navigate(
+      { targetRoute: 'current', assetId: null, assetGridScrollTarget: $gridScrollTarget },
+      { replaceState: true },
+    );
   };
 
-  // const updateScrollTarget = debounce(updateScroll, 1);
-  // const updateScrollTarget = updateScroll;
-  const updateScrollTarget = () => void 0;
-
   const scrollToTarget = ({ target, offset }: { target: AssetBucket; offset: number }) => {
-    console.log('scrolling!!!!');
-    debugger;
     const buckets = $assetStore.buckets;
 
     // Set 'above' to all bucket positions above the target so that in case they
@@ -229,7 +169,7 @@
       }
       bucket.position = BucketPosition.Above;
     }
-
+    debugger;
     internalScroll = true;
     element.scrollTo({ top: offset });
     $assetStore.clearPendingScroll();
@@ -324,11 +264,6 @@
     }
   }
 
-  function handleScrollTimeline(event: CustomEvent) {
-    console.log('shitf=');
-    element.scrollBy(0, event.detail.heightDelta);
-  }
-
   const handlePrevious = async () => {
     const previousAsset = await assetStore.getPreviousAsset($viewingAsset);
 
@@ -354,11 +289,10 @@
   };
 
   const handleClose = async ({ detail: { asset } }: { detail: { asset: AssetResponseDto } }) => {
+    showSkeleton = true;
     assetViewingStore.showAssetViewer(false);
-    const assetGridScrollTarget = { assetId: asset.id, date: null };
-    await setGridScrollTarget(assetGridScrollTarget);
-    await assetStore.scheduleScrollToAssetId(assetGridScrollTarget);
-    await navigate({ targetRoute: 'current', assetId: null, assetGridScrollTarget });
+    $gridScrollTarget = { assetId: asset.id, date: null };
+    await navigate({ targetRoute: 'current', assetId: null, assetGridScrollTarget: $gridScrollTarget });
   };
 
   const handleAction = async (action: AssetAction, asset: AssetResponseDto) => {
@@ -389,12 +323,6 @@
       }
     }
   };
-
-  const scrollTimelineY = () => {
-    timelineY = element?.scrollTop || 0;
-  };
-
-  const handleTimelineScroll = debounce(scrollTimelineY);
 
   let lastAssetMouseEvent: AssetResponseDto | null = null;
 
@@ -593,7 +521,7 @@
   bind:clientHeight={viewport.height}
   bind:clientWidth={viewport.width}
   bind:this={element}
-  on:scroll={() => (handleTimelineScroll(), void updateScrollTarget())}
+  on:scroll={() => handleTimelineScroll()}
 >
   <!-- skeleton -->
   {#if showSkeleton}
@@ -635,7 +563,7 @@
           <div id={'bucket_' + bucket.bucketDate} style:height={bucket.bucketHeight + 'px'}>
             {#if showGroup}
               <AssetDateGroup
-                something={element}
+                assetGridElement={element}
                 bottom={'1000px'}
                 bind:this={assetGroupCmp[index]}
                 {withStacked}

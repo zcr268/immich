@@ -2,7 +2,7 @@
   import IntersectionObserver from '$lib/components/asset-viewer/intersection-observer.svelte';
   import Icon from '$lib/components/elements/icon.svelte';
   import type { AssetInteractionStore } from '$lib/stores/asset-interaction.store';
-  import { assetViewingStore } from '$lib/stores/asset-viewing.store';
+
   import { AssetBucket, type AssetStore, type Viewport } from '$lib/stores/assets.store';
   import { locale } from '$lib/stores/preferences.store';
   import { getAssetRatio } from '$lib/utils/asset-utils';
@@ -20,7 +20,7 @@
   import { fly } from 'svelte/transition';
   import Thumbnail from '../assets/thumbnail/thumbnail.svelte';
   import { handlePromiseError } from '$lib/utils';
-  import { goto } from '$app/navigation';
+
   import { navigate } from '$lib/utils/navigation';
 
   export let element: HTMLElement | undefined = undefined;
@@ -32,86 +32,21 @@
   export let singleSelect = false;
   export let withStacked = false;
   export let showArchiveIcon = false;
-  export let something: HTMLElement | undefined = undefined;
+  export let assetGridElement: HTMLElement | undefined = undefined;
   export let bottom: string | undefined = undefined;
   export let assetStore: AssetStore;
   export let assetInteractionStore: AssetInteractionStore;
   export let onScrollTarget: (({ target, offset }: { target: AssetBucket; offset: number }) => void) | undefined =
     undefined;
-  export let onAssetInGrid: (asset: AssetResponseDto) => void | undefined = undefined;
+  export let onAssetInGrid: ((asset: AssetResponseDto) => void) | undefined = undefined;
   /* TODO figure out a way to calculate this*/
   const TITLE_HEIGHT = 51;
-
-  function nextRowIndex(geometry: GeometryType, start: number) {
-    const offsetIndex = geometry.boxes.slice(start).findIndex((box) => box.left === 0);
-    return offsetIndex === -1 ? -1 : offsetIndex + start;
-  }
-
-  function findLeftMost(geometry: GeometryType, top: number) {
-    // note: every boxes.left === 0 indicates start of new row
-    const { topOffset: geoTopOffset } = geometry;
-    // const t = top;
-    for (let j = 0; j < geometry.gridHeights.length; j++) {
-      const rowTop = geometry.gridHeights[j] + geoTopOffset;
-      // let nextRowTop = 0;
-      // if (j === geometry.gridHeights.length - 1) {
-      //   geometry.containerHeight;
-      // }
-      const nextRowTop =
-        (j === geometry.gridHeights.length - 1 ? geometry.containerHeight : geometry.gridHeights[j + 1]) + geoTopOffset;
-      if (top >= rowTop - 0.2 && top < nextRowTop) {
-        // console.log('ok');
-        return geometry.assets[geometry.gridOffsets[j]];
-      }
-    }
-    // debugger;
-    // for (let j = 0; j < geometry.boxes.length; ) {
-    //   const rowTop = geometry.boxes[j].top + geoTopOffset;
-    //   const nextRow = nextRowIndex(geometry, j + 1);
-    //   const nextRowTop = (nextRow === -1 ? geometry.containerHeight : geometry.boxes[nextRow].top) + geoTopOffset;
-    //   // 0.2 is row height tolerance
-    //   if (top >= rowTop - 0.2 && top < nextRowTop) {
-    //     return geometry.assets[j];
-    //   }
-
-    //   if (nextRow === -1) {
-    //     break;
-    //   }
-    //   j = nextRow;
-    // }
-  }
-
-  export function findAssetAtTopLeftPosition(top: number) {
-    if (top < 0) {
-      return;
-    }
-
-    for (let i = 0; i < geometry.length; i++) {
-      const reltop = top - i * TITLE_HEIGHT;
-
-      const geo = geometry[i];
-      const cur_number = geo.topOffset;
-      const next_number = i === geometry.length - 1 ? bucketHeight : geometry[i + 1].topOffset;
-
-      if (reltop >= cur_number && reltop < next_number) {
-        // console.log(
-        //   'top!',
-        //   reltop,
-        //   top,
-        //   top - i * TITLE_HEIGHT,
-        //   geo.topOffset,
-        //   geo.containerHeight + geo.topOffset,
-        //   geo.assets,
-        //   geo.gridHeights,
-        // );
-        // return findLeftMost(geo, top - i * TITLE_HEIGHT);
-        return findLeftMost(geo, reltop);
-      } else {
-        // console.log('not ', reltop, cur_number, next_number);
-      }
-    }
-  }
-
+  const LAYOUT_OPTIONS = {
+    boxSpacing: 2,
+    containerPadding: 0,
+    targetRowHeightTolerance: 0.15,
+    targetRowHeight: 235,
+  };
   const { selectedGroup, selectedAssets, assetSelectionCandidates, isMultiSelectState } = assetInteractionStore;
   const dispatch = createEventDispatcher<{
     select: { title: string; assets: AssetResponseDto[] };
@@ -125,15 +60,10 @@
   let hoveredDateGroup = '';
   let assetsGroupByDate: AssetResponseDto[][];
 
-  type GeometryType = Omit<ReturnType<typeof justifiedLayout>, 'boxes'> & {
-    boxes: (LayoutBox & {
-      gridrow: number;
-    })[];
+  type GeometryType = ReturnType<typeof justifiedLayout> & {
+    boxes: LayoutBox[];
     containerWidth: number;
     assets: AssetResponseDto[];
-    topOffset: number;
-    gridOffsets: number[];
-    gridHeights: number[];
   };
 
   let geometry: GeometryType[] = [];
@@ -156,49 +86,21 @@
 
   $: {
     assetsGroupByDate = splitBucketIntoDateGroups(assets, $locale);
-    const layoutOptions = {
-      boxSpacing: 2,
-      containerWidth: Math.floor(viewport.width),
-      containerPadding: 0,
-      targetRowHeightTolerance: 0.15,
-      targetRowHeight: 235,
-    };
-    if (bucketDate === '2024-03-01T00:00:00.000Z') {
-      // debugger;
-    }
     geometry = [];
-    let topOffset = 0;
-    for (const [k, group] of assetsGroupByDate.entries()) {
+    for (const group of assetsGroupByDate) {
       const layoutResult = justifiedLayout(
-        group.map((assetGroup) => getAssetRatio(assetGroup)),
-        layoutOptions,
+        group.map((g) => getAssetRatio(g)),
+        {
+          ...LAYOUT_OPTIONS,
+          containerWidth: Math.floor(viewport.width),
+        },
       );
       const geo = {
         ...layoutResult,
         containerWidth: calculateWidth(layoutResult.boxes),
         assets: group,
-        topOffset,
-        gridOffsets: [],
-        gridHeights: [],
-      } as unknown as GeometryType;
-
-      let index = -1;
-      for (const [i, box] of geo.boxes.entries()) {
-        if (box.left === 0) {
-          geo.gridOffsets.push(i);
-          if (index === -1) {
-            geo.gridHeights.push(box.top);
-          } else {
-            geo.gridHeights.push(box.top);
-          }
-        }
-        box.gridrow = index;
-      }
-
+      };
       geometry.push(geo);
-      // const offset = k * TITLE_HEIGHT;
-      const offset = 0;
-      topOffset += layoutResult.containerHeight + offset;
     }
   }
 
@@ -209,9 +111,6 @@
         handlePromiseError(tick().then(() => scrollTimeline(heightDelta)));
       }
     }
-  }
-  $: {
-    console.log('pending id', $assetStore.pendingScrollAssetId);
   }
 
   function scrollTimeline(heightDelta: number) {
@@ -298,38 +197,25 @@
       <!-- Image grid -->
       <div
         class="relative"
-        data-geo-top={geometry[groupIndex].topOffset}
-        data-geo-idx={groupIndex}
         style="height: {geometry[groupIndex].containerHeight}px;width: {geometry[groupIndex].containerWidth}px"
       >
         {#each groupAssets as asset, index (asset.id)}
           {@const box = geometry[groupIndex].boxes[index]}
 
           <div
-            data-gridrow-top={geometry[groupIndex].gridHeights[geometry[groupIndex].boxes[index].gridrow]}
             class="absolute"
             style="width: {box.width}px; height: {box.height}px; top: {box.top}px; left: {box.left}px"
           >
             <IntersectionObserver
-              root={something}
-              top={'-51px'}
+              root={assetGridElement}
+              top={`-${TITLE_HEIGHT}px`}
               bottom={`-99%`}
               right={'-99%'}
-              data={asset.id}
               once={false}
-              on:intersected={() => {
-                // debugger;
-                console.log('cool', asset.id);
-                debugger;
-                onAssetInGrid(asset);
-              }}
-              on:hidden={() => {
-                // debugger;
-                // console.log('hidden', asset.id);
-              }}
+              on:intersected={() => onAssetInGrid?.(asset)}
             >
               <Thumbnail
-                root={something}
+                root={assetGridElement}
                 {bottom}
                 {assetStore}
                 showStackedIcon={withStacked}
@@ -343,9 +229,7 @@
                     assetSelectHandler(asset, groupAssets, groupTitle);
                     return;
                   }
-                  debugger;
                   void navigate({ targetRoute: 'current', assetId: asset.id });
-                  // assetViewingStore.setAsset(asset);
                 }}
                 on:select={() => assetSelectHandler(asset, groupAssets, groupTitle)}
                 on:mouse-event={() => assetMouseEventHandler(groupTitle, asset)}

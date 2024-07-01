@@ -8,7 +8,6 @@
   export let left = '0px';
   export let right = '0px';
   export let root: HTMLElement | null = null;
-  export let data: string | null = null;
 
   export let intersecting = false;
   let container: HTMLDivElement;
@@ -59,24 +58,6 @@
       observer.observe(container);
       return () => observer.unobserve(container);
     }
-
-    // The following is a fallback for older browsers
-    function handler() {
-      const bcr = container.getBoundingClientRect();
-
-      intersecting =
-        bcr.bottom + bottom > 0 &&
-        bcr.right + right > 0 &&
-        bcr.top - top < window.innerHeight &&
-        bcr.left - left < window.innerWidth;
-
-      if (intersecting && once) {
-        window.removeEventListener('scroll', handler);
-      }
-    }
-
-    window.addEventListener('scroll', handler);
-    return () => window.removeEventListener('scroll', handler);
   });
 </script>
 

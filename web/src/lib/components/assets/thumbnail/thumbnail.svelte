@@ -18,13 +18,12 @@
     mdiMotionPlayOutline,
     mdiRotate360,
   } from '@mdi/js';
-  import { createEventDispatcher, onMount } from 'svelte';
+  import { createEventDispatcher } from 'svelte';
   import { fade } from 'svelte/transition';
   import ImageThumbnail from './image-thumbnail.svelte';
   import VideoThumbnail from './video-thumbnail.svelte';
   import { currentUrlReplaceAssetId } from '$lib/utils/navigation';
   import { AssetStore } from '$lib/stores/assets.store';
-  import { assetViewingStore } from '$lib/stores/asset-viewing.store';
 
   const dispatch = createEventDispatcher<{
     select: { asset: AssetResponseDto };
@@ -42,7 +41,6 @@
   export let readonly = false;
   export let showArchiveIcon = false;
   export let showStackedIcon = true;
-  export let scrollTarget = false;
   export let root: HTMLElement | undefined = undefined;
   export let bottom: string | undefined = undefined;
 
@@ -59,7 +57,6 @@
   $: {
     // console.log(asset.id);
     if ($assetStore?.pendingScrollAssetId === asset.id && thumbnailElement) {
-      console.log('READDD FOUND IT!!', scrollTarget);
       onScrollTarget?.(thumbnailElement);
     }
   }
@@ -112,7 +109,7 @@
   // }
 </script>
 
-<IntersectionObserver {root} {bottom} data={asset.id} once={false} on:intersected let:intersecting>
+<IntersectionObserver {root} {bottom} once={false} on:intersected let:intersecting>
   <a
     bind:this={thumbnailElement}
     href={currentUrlReplaceAssetId(asset.id)}
@@ -208,7 +205,6 @@
         {#if asset.resized}
           <ImageThumbnail
             url={getAssetThumbnailUrl({ id: asset.id, size: AssetMediaSize.Thumbnail, checksum: asset.checksum })}
-            extra={asset}
             altText={getAltText(asset)}
             widthStyle="{width}px"
             heightStyle="{height}px"

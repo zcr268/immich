@@ -57,7 +57,6 @@
   import PhotoViewer from './photo-viewer.svelte';
   import SlideshowBar from './slideshow-bar.svelte';
   import VideoViewer from './video-wrapper-viewer.svelte';
-  import { navigate } from '$lib/utils/navigation';
   import { websocketEvents } from '$lib/stores/websocket';
   import { canCopyImagesToClipboard } from 'copy-image-clipboard';
   import { t } from 'svelte-i18n';

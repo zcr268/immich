@@ -119,8 +119,8 @@ export class AssetStore {
     height: 0,
     width: 0,
   };
-  private didinit: boolean = false;
-  private $initializedSignal: () => void;
+
+  private $initializedSignal!: () => void;
   /**
    * A promise that resolves once the bucket is loaded, and rejects if bucket is canceled.
    */
@@ -233,17 +233,15 @@ export class AssetStore {
   }, 2500);
 
   async init(viewport: Viewport) {
-    if (this.didinit) {
+    if (this.initialized) {
       throw 'Can only init once';
     }
-    this.didinit = true;
+
     this.complete = new Promise((resolve) => {
       this.$initializedSignal = resolve;
     });
-    // supress uncaught rejection
+    //  uncaught rejection go away
     this.complete.catch(() => void 0);
-
-    this.initialized = false;
     this.timelineHeight = 0;
     this.buckets = [];
     this.assets = [];
@@ -455,44 +453,32 @@ export class AssetStore {
 
     const asset = await getAssetInfo({ id });
     if (asset) {
-      console.log('load local time');
       const bucket = await this.loadBucketAtTime(asset.localDateTime, true);
       return bucket;
-    } else {
-      console.log('no asset info');
     }
   }
 
   /* Must be paired with matching clearPendingScroll() call */
   async scheduleScrollToAssetId(scrollTarget?: AssetGridScrollTarget | null) {
-    console.log('Scheduling', scrollTarget);
-    await this.complete;
     if (!scrollTarget) {
       return false;
     }
-    console.log('Scheduling2', scrollTarget);
-    debugger;
+    await this.complete;
+
     try {
       const { assetId, date } = scrollTarget;
       if (assetId) {
         const bucket = await this.findBucketForAssetId(assetId);
         if (bucket) {
-          console.log('set pending', assetId);
           this.pendingScrollBucket = bucket;
           this.pendingScrollAssetId = assetId;
           this.emit(false);
-        } else {
-          console.log('no buck');
         }
       } else if (date) {
-        console.log('not found', scrollTarget);
-        debugger;
         const bucket = this.getBucketByDate(date);
         if (bucket) {
           this.pendingScrollBucket = bucket;
           this.emit(false);
-        } else {
-          console.log('oops');
         }
       }
     } catch {
@@ -502,7 +488,6 @@ export class AssetStore {
   }
 
   clearPendingScroll() {
-    console.log('clear pending');
     this.pendingScrollBucket = undefined;
     this.pendingScrollAssetId = undefined;
   }
@@ -515,7 +500,6 @@ export class AssetStore {
       date = date.set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
     }
     const iso = date.toISO()!;
-    console.log(iso);
     await this.loadBucket(iso, BucketPosition.Unknown, preventCancel);
     return this.getBucketByDate(iso);
   }

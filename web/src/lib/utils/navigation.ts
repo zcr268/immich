@@ -1,6 +1,6 @@
 import { goto } from '$app/navigation';
 import { page } from '$app/stores';
-import { AppRoute, QueryParameter } from '$lib/constants';
+import { AppRoute } from '$lib/constants';
 import { getAssetInfo } from '@immich/sdk';
 import type { NavigationTarget } from '@sveltejs/kit';
 import { get } from 'svelte/store';
@@ -113,7 +113,6 @@ async function navigateAssetRoute(route: AssetRoute, options?: NavOptions) {
   const next = assetId ? currentUrlReplaceAssetId(assetId) : currentUrlWithoutAsset();
   const current = currentUrl();
   if (next !== current) {
-    console.log('@@@NAV!', next);
     await goto(next, options);
   }
 }
@@ -124,7 +123,6 @@ async function navigateAssetGridRoute(route: AssetGridRoute, options?: NavOption
   const next = replaceScrollTarget(assetUrl, assetGridScrollTarget);
   const current = currentUrl();
   if (next !== current) {
-    console.log('@@@NAV2', next);
     await goto(next, options);
   }
 }

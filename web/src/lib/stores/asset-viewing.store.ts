@@ -1,13 +1,13 @@
 import { getKey } from '$lib/utils';
-import { navigate, type AssetGridScrollTarget } from '$lib/utils/navigation';
+import { type AssetGridScrollTarget } from '$lib/utils/navigation';
 import { getAssetInfo, type AssetResponseDto } from '@immich/sdk';
-import { get, writable } from 'svelte/store';
+import { writable } from 'svelte/store';
 
 function createAssetViewingStore() {
   const viewingAssetStoreState = writable<AssetResponseDto>();
   const preloadAssets = writable<AssetResponseDto[]>([]);
   const viewState = writable<boolean>(false);
-  const scrollTarget = writable<AssetGridScrollTarget | null | undefined>();
+  const gridScrollTarget = writable<AssetGridScrollTarget | null | undefined>();
 
   const setAsset = (asset: AssetResponseDto, assetsToPreload: AssetResponseDto[] = []) => {
     preloadAssets.set(assetsToPreload);
@@ -24,10 +24,6 @@ function createAssetViewingStore() {
     viewState.set(show);
   };
 
-  const setGridScrollTarget = (assetGridScrollTarget: AssetGridScrollTarget) => {
-    scrollTarget.set(assetGridScrollTarget);
-  };
-
   return {
     asset: {
       subscribe: viewingAssetStoreState.subscribe,
@@ -39,10 +35,7 @@ function createAssetViewingStore() {
       subscribe: viewState.subscribe,
       set: viewState.set,
     },
-    gridScrollTarget: {
-      subscribe: scrollTarget.subscribe,
-    },
-    setGridScrollTarget,
+    gridScrollTarget,
     setAsset,
     setAssetId,
     showAssetViewer,
