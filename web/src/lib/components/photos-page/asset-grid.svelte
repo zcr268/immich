@@ -99,7 +99,7 @@
       return;
     }
     void $assetStore.scheduleScrollToAssetId($gridScrollTarget);
-    $gridScrollTarget?.at ? void 0 : (showSkeleton = false);
+    $gridScrollTarget?.at ? void 0 : (element.scrollTo({ top: 0 }), (showSkeleton = false));
   };
 
   afterNavigate(({ complete }) => {

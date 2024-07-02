@@ -21,23 +21,25 @@
   export let preload = true;
   export let eyeColor: 'black' | 'white' = 'white';
 
-  let duration: number = 300;
-
+  let duration: number = 150;
   let complete = false;
+  let error = false;
   let img: HTMLImageElement;
 
-  onMount(async () => {
-    try {
-      const t1 = Date.now();
-      await img.decode();
-      const t2 = Date.now();
-      if (t2 - t1 < 50) {
-        duration = 0;
-      }
+  onMount(() => {
+    const onload = () => {
       complete = true;
-    } catch {
-      // ignore decoding errors
-    }
+    };
+    const onerror = () => {
+      error = true;
+    };
+    img.complete ? onload() : void 0;
+    img.addEventListener('load', onload);
+    img.addEventListener('error', onerror);
+    return () => {
+      img?.removeEventListener('load', onload);
+      img?.removeEventListener('error', onerror);
+    };
   });
 </script>
 
@@ -49,7 +51,7 @@
   style:filter={hidden ? 'grayscale(50%)' : 'none'}
   style:opacity={hidden ? '0.5' : '1'}
   src={url}
-  alt={altText}
+  alt={complete || error ? altText : ''}
   {title}
   class="object-cover transition duration-300 {border
     ? 'border-[3px] border-immich-dark-primary/80 hover:border-immich-primary'
@@ -68,12 +70,12 @@
   </div>
 {/if}
 
-{#if thumbhash && !complete}
+{#if thumbhash && (!complete || error)}
   <img
     style:width={widthStyle}
     style:height={heightStyle}
     src={thumbHashToDataURL(Buffer.from(thumbhash, 'base64'))}
-    alt={altText}
+    alt={complete || error ? altText : ''}
     {title}
     class="absolute top-0 object-cover"
     class:rounded-xl={curve}
