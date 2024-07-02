@@ -34,9 +34,10 @@ export class AssetBucket {
    * The DOM height of the bucket in pixel
    * This value is first estimated by the number of asset and later is corrected as the user scroll
    */
-  bucketHeight: number = 0;
+  bucketHeight = 0;
+  bucketHeightActual = false;
   bucketDate!: string;
-  bucketCount: number = 0;
+  bucketCount = 0;
   assets: AssetResponseDto[] = [];
   cancelToken: AbortController | null = null;
   position: BucketPosition = BucketPosition.Unknown;
@@ -115,7 +116,7 @@ export class AssetStore {
   private assetToBucket: Record<string, AssetLookup> = {};
   private pendingChanges: PendingChange[] = [];
   private unsubscribers: Unsubscriber[] = [];
-  private options: AssetApiGetTimeBucketsRequest;
+  options: AssetApiGetTimeBucketsRequest;
   private viewport: Viewport = {
     height: 0,
     width: 0,
@@ -233,7 +234,7 @@ export class AssetStore {
     this.emit(true);
   }, 2500);
 
-  async init(viewport: Viewport) {
+  async init() {
     if (this.initialized) {
       throw 'Can only init once';
     }
@@ -259,22 +260,21 @@ export class AssetStore {
     );
     this.$initializedSignal();
     this.initialized = true;
-    // if loading an asset, the grid-view may be hidden, which means
-    // it has 0 width and height. No need to update bucket or timeline
-    // heights in this case. Later, updateViewport will be called to
-    // update the heights.
-    if (viewport.height !== 0 && viewport.width !== 0) {
-      await this.updateViewport(viewport);
-    }
   }
 
   async updateViewport(viewport: Viewport) {
     if (!this.initialized && this.viewport.height === viewport.height && this.viewport.width === viewport.width) {
       return;
     }
+    if (viewport.height === 0 && viewport.width === 0) {
+      return;
+    }
     this.viewport = { ...viewport };
 
     for (const bucket of this.buckets) {
+      if (bucket.bucketHeightActual) {
+        continue;
+      }
       const unwrappedWidth = (3 / 2) * bucket.bucketCount * THUMBNAIL_HEIGHT * (7 / 10);
       const rows = Math.ceil(unwrappedWidth / viewport.width);
       const height = 51 + rows * THUMBNAIL_HEIGHT;
@@ -368,6 +368,7 @@ export class AssetStore {
       return 0;
     }
 
+    bucket.bucketHeightActual = true;
     const delta = height - bucket.bucketHeight;
     const scrollTimeline = bucket.position == BucketPosition.Above;
 
@@ -451,7 +452,6 @@ export class AssetStore {
     if (bucketInfo) {
       return bucketInfo.bucket;
     }
-
     const asset = await getAssetInfo({ id });
     if (asset) {
       const bucket = await this.loadBucketAtTime(asset.localDateTime, true);

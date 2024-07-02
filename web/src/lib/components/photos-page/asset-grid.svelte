@@ -6,9 +6,9 @@
   import { assetViewingStore } from '$lib/stores/asset-viewing.store';
   import {
     AssetBucket,
+    AssetStore,
     BucketPosition,
     isSelectingAllAssets,
-    type AssetStore,
     type Viewport,
   } from '$lib/stores/assets.store';
   import { locale, showDeleteModal } from '$lib/stores/preferences.store';
@@ -19,7 +19,7 @@
   import { formatGroupTitle, splitBucketIntoDateGroups } from '$lib/utils/timeline-util';
   import type { AlbumResponseDto, AssetResponseDto } from '@immich/sdk';
   import { DateTime } from 'luxon';
-  import { createEventDispatcher, onDestroy, onMount } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
   import IntersectionObserver from '../asset-viewer/intersection-observer.svelte';
   import Portal from '../shared-components/portal/portal.svelte';
   import Scrollbar from '../shared-components/scrollbar/scrollbar.svelte';
@@ -30,9 +30,11 @@
   import { handlePromiseError } from '$lib/utils';
   import { selectAllAssets } from '$lib/utils/asset-utils';
   import { navigate } from '$lib/utils/navigation';
+  import { page } from '$app/stores';
 
   export let isSelectionMode = false;
   export let singleSelect = false;
+  export let partOfRoute: boolean;
   export let assetStore: AssetStore;
   export let assetInteractionStore: AssetInteractionStore;
   export let removeAction: AssetAction | null = null;
@@ -47,6 +49,7 @@
   const { assetSelectionCandidates, assetSelectionStart, selectedGroup, selectedAssets, isMultiSelectState } =
     assetInteractionStore;
   const viewport: Viewport = { width: 0, height: 0 };
+  const safeViewport: Viewport = { width: 0, height: 0 };
   let { isViewing: showAssetViewer, asset: viewingAsset, preloadAssets, gridScrollTarget } = assetViewingStore;
 
   let element: HTMLElement;
@@ -65,8 +68,25 @@
     }
   }
 
+  const isViewportOrigin = () => {
+    return viewport.height === 0 && viewport.width === 0;
+  };
+
+  const isEqual = (a: Viewport, b: Viewport) => {
+    return a.height == b.height && a.width == b.width;
+  };
+
   $: {
-    void assetStore.updateViewport(viewport);
+    if (element && isViewportOrigin()) {
+      const rect = element.getBoundingClientRect();
+      viewport.height = rect.height;
+      viewport.width = rect.width;
+    }
+    if (!isViewportOrigin() && !isEqual(viewport, safeViewport)) {
+      safeViewport.height = viewport.height;
+      safeViewport.width = viewport.width;
+      void $assetStore.updateViewport(safeViewport);
+    }
   }
 
   let navigating = false;
@@ -90,39 +110,57 @@
     navigating = true;
   });
 
-  if (import.meta.hot) {
-    // hmr will set the skeleton back to true by default, but there is no subsequent history
-    // load to complete the load, so the stencil stays during hmr
-    /* eslint-disable-next-line  unicorn/no-lonely-if */
-    if (import.meta.hot.data.id) {
-      showSkeleton = false;
+  const hmrSupport = () => {
+    // when hmr happens, skeleton is initialized to true by default
+    // normally, loading asset-grid is part of a navigation event, and the completion of
+    // that event triggers a scroll-to-asset, if necessary, when then clears the skeleton.
+    // this handler will run the navigation/scroll-to-asset handler when hmr is performed,
+    // preventing skeleton from showing after hmr
+    if (import.meta && import.meta.hot) {
+      const afterApdate = () => {
+        const asset = $page.url.searchParams.get('at');
+        $gridScrollTarget = { at: asset };
+        completeNav();
+      };
+      import.meta.hot?.on('vite:afterUpdate', afterApdate);
+      return () => import.meta.hot?.off('vite:afterUpdate', afterApdate);
     }
-  }
+    return () => void 0;
+  };
 
-  onMount(async () => {
+  onMount(() => {
     if ($assetStore.initialized) {
       showSkeleton = false;
     } else {
       $assetStore.connect();
-      await $assetStore.init(viewport);
+      void $assetStore.init().then(() => $assetStore.updateViewport(safeViewport));
     }
-  });
-
-  onDestroy(() => {
-    $assetStore.disconnect();
+    if (!partOfRoute) {
+      showSkeleton = false;
+    }
+    const dispose = hmrSupport();
+    return () => {
+      $assetStore.disconnect();
+      dispose();
+    };
   });
 
   /* eslint-disable-next-line  @typescript-eslint/no-explicit-any */
   function wrapRAF<T extends (...args: any) => any>(fn: T) {
     let updating = false;
+    // @ts-expect-error no implicit any
+    let _args;
     /* eslint-disable-next-line  @typescript-eslint/no-explicit-any */
     return (...args: any) => {
+      // assume latest args are the ones to use
+      _args = args;
       if (updating) {
         return;
       }
       updating = true;
       requestAnimationFrame(() => {
-        fn.call(undefined, ...args);
+        // @ts-expect-error no implicit any
+        fn.call(undefined, ..._args);
         updating = false;
       });
     };
@@ -136,16 +174,18 @@
   const scrollTimelineY = () => {
     timelineY = element?.scrollTop || 0;
   };
-
   const handleTimelineScroll = wrapRAF(scrollTimelineY);
 
-  function scrollTimeline(event: CustomEvent) {
+  // do not put this in a RAF - RAF will skip some of the events
+  // if they are sent in quick successtion. This event is sent
+  // by the date-group to maintain scroll position, and every
+  // event must be delivered.
+  function handleScrollTimeline(event: CustomEvent) {
     element.scrollBy(0, event.detail.heightDelta);
   }
-  const handleScrollTimeline = wrapRAF(scrollTimeline);
 
   const onAssetInGrid = async (asset: AssetResponseDto) => {
-    if (navigating) {
+    if (!partOfRoute || navigating) {
       return;
     }
     $gridScrollTarget = { at: asset.id };
@@ -175,7 +215,11 @@
 
   const trashOrDelete = async (force: boolean = false) => {
     isShowDeleteConfirmation = false;
-    await deleteAssets(!(isTrashEnabled && !force), (assetIds) => assetStore.removeAssets(assetIds), idsSelectedAssets);
+    await deleteAssets(
+      !(isTrashEnabled && !force),
+      (assetIds) => $assetStore.removeAssets(assetIds),
+      idsSelectedAssets,
+    );
     assetInteractionStore.clearMultiselect();
   };
 
@@ -200,7 +244,7 @@
   const onStackAssets = async () => {
     const ids = await stackAssets(Array.from($selectedAssets));
     if (ids) {
-      assetStore.removeAssets(ids);
+      $assetStore.removeAssets(ids);
       dispatch('escape');
     }
   };
@@ -208,7 +252,7 @@
   const toggleArchive = async () => {
     const ids = await archiveAssets(Array.from($selectedAssets), !isAllArchived);
     if (ids) {
-      assetStore.removeAssets(ids);
+      $assetStore.removeAssets(ids);
       deselectAllAssets();
     }
   };
@@ -228,7 +272,7 @@
       { shortcut: { key: 'Escape' }, onShortcut: () => dispatch('escape') },
       { shortcut: { key: '?', shift: true }, onShortcut: () => (showShortcuts = !showShortcuts) },
       { shortcut: { key: '/' }, onShortcut: () => goto(AppRoute.EXPLORE) },
-      { shortcut: { key: 'A', ctrl: true }, onShortcut: () => selectAllAssets(assetStore, assetInteractionStore) },
+      { shortcut: { key: 'A', ctrl: true }, onShortcut: () => selectAllAssets($assetStore, assetInteractionStore) },
       { shortcut: { key: 'PageDown' }, preventDefault: false, onShortcut: focusElement },
       { shortcut: { key: 'PageUp' }, preventDefault: false, onShortcut: focusElement },
     ];
@@ -247,25 +291,27 @@
   })();
 
   const handleSelectAsset = (asset: AssetResponseDto) => {
-    if (!assetStore.albumAssets.has(asset.id)) {
+    if (!$assetStore.albumAssets.has(asset.id)) {
       assetInteractionStore.selectAsset(asset);
     }
   };
 
   function intersectedHandler(event: CustomEvent) {
     const element_ = event.detail.container as HTMLElement;
-    const target = element_.firstChild as HTMLElement;
+    const target = element_.firstElementChild as HTMLElement;
     if (target) {
-      const bucketDate = target.id.split('_')[1];
-      void assetStore.loadBucket(bucketDate, event.detail.position);
+      const bucketDate = target.dataset.bucketDate;
+      if (bucketDate) {
+        void $assetStore.loadBucket(bucketDate, event.detail.position);
+      }
     }
   }
 
   const handlePrevious = async () => {
-    const previousAsset = await assetStore.getPreviousAsset($viewingAsset);
+    const previousAsset = await $assetStore.getPreviousAsset($viewingAsset);
 
     if (previousAsset) {
-      const preloadAsset = await assetStore.getPreviousAsset(previousAsset);
+      const preloadAsset = await $assetStore.getPreviousAsset(previousAsset);
       assetViewingStore.setAsset(previousAsset, preloadAsset ? [preloadAsset] : []);
       await navigate({ targetRoute: 'current', assetId: previousAsset.id });
     }
@@ -274,10 +320,10 @@
   };
 
   const handleNext = async () => {
-    const nextAsset = await assetStore.getNextAsset($viewingAsset);
+    const nextAsset = await $assetStore.getNextAsset($viewingAsset);
 
     if (nextAsset) {
-      const preloadAsset = await assetStore.getNextAsset(nextAsset);
+      const preloadAsset = await $assetStore.getNextAsset(nextAsset);
       assetViewingStore.setAsset(nextAsset, preloadAsset ? [preloadAsset] : []);
       await navigate({ targetRoute: 'current', assetId: nextAsset.id });
     }
@@ -302,7 +348,7 @@
         (await handleNext()) || (await handlePrevious()) || (await handleClose({ detail: { asset } }));
 
         // delete after find the next one
-        assetStore.removeAssets([asset.id]);
+        $assetStore.removeAssets([asset.id]);
         break;
       }
 
@@ -310,12 +356,12 @@
       case AssetAction.UNARCHIVE:
       case AssetAction.FAVORITE:
       case AssetAction.UNFAVORITE: {
-        assetStore.updateAssets([asset]);
+        $assetStore.updateAssets([asset]);
         break;
       }
 
       case AssetAction.ADD: {
-        assetStore.addAssets([asset]);
+        $assetStore.addAssets([asset]);
         break;
       }
     }
@@ -430,7 +476,7 @@
       // Select/deselect assets in all intermediate buckets
       for (let bucketIndex = startBucketIndex + 1; bucketIndex < endBucketIndex; bucketIndex++) {
         const bucket = $assetStore.buckets[bucketIndex];
-        await assetStore.loadBucket(bucket.bucketDate, BucketPosition.Unknown);
+        await $assetStore.loadBucket(bucket.bucketDate, BucketPosition.Unknown);
         for (const asset of bucket.assets) {
           if (deselect) {
             assetInteractionStore.removeAssetFromMultiselectGroup(asset);
@@ -505,7 +551,7 @@
 <Scrollbar
   invisible={showSkeleton}
   {assetStore}
-  height={viewport.height}
+  height={safeViewport.height}
   {timelineY}
   on:scrollTimeline={updateScrollPositon}
 />
@@ -551,7 +597,7 @@
           root={element}
         >
           {@const showGroup = intersecting || bucket === $assetStore.pendingScrollBucket}
-          <div id={'bucket_' + bucket.bucketDate} style:height={bucket.bucketHeight + 'px'}>
+          <div data-bucket-date={bucket.bucketDate} style:height={bucket.bucketHeight + 'px'}>
             {#if showGroup}
               <AssetDateGroup
                 assetGridElement={element}
@@ -573,8 +619,10 @@
                 assets={bucket.assets}
                 bucketDate={bucket.bucketDate}
                 bucketHeight={bucket.bucketHeight}
-                {viewport}
+                viewport={safeViewport}
               />
+            {:else}
+              <p>nope</p>
             {/if}
           </div>
         </IntersectionObserver>
@@ -614,14 +662,8 @@
   }
   #skeleton {
     visibility: hidden;
-    animation: 0s linear 0.3s forwards delayedVisibility;
-  }
-  #test {
-    background: blue;
-    position: absolute;
-    top: 10px;
-    width: 100%;
-    height: 100px;
-    z-index: 100;
+    animation:
+      0s linear 0.3s forwards delayedVisibility,
+      pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 </style>

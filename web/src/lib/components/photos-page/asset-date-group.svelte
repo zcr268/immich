@@ -43,6 +43,7 @@
   export let onAssetInGrid: ((asset: AssetResponseDto) => void) | undefined = undefined;
   /* TODO figure out a way to calculate this*/
   const TITLE_HEIGHT = 51;
+  const ASSET_GRID_PADDING = 60;
   const LAYOUT_OPTIONS = {
     boxSpacing: 2,
     containerPadding: 0,
@@ -60,7 +61,7 @@
   let isMouseOverGroup = false;
   let actualBucketHeight: number;
   let hoveredDateGroup = '';
-  let assetsGroupByDate: AssetResponseDto[][];
+  let assetsGroupByDate: AssetResponseDto[][] = [];
 
   type GeometryType = ReturnType<typeof justifiedLayout> & {
     boxes: LayoutBox[];
@@ -210,8 +211,8 @@
             <IntersectionObserver
               root={assetGridElement}
               top={`-${TITLE_HEIGHT}px`}
-              bottom={`-99%`}
-              right={'-99%'}
+              bottom={`-${viewport.height - TITLE_HEIGHT - ASSET_GRID_PADDING - 1}px`}
+              right={`-${viewport.width - 1}px`}
               once={false}
               on:intersected={() => onAssetInGrid?.(asset)}
             >

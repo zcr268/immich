@@ -26,7 +26,8 @@ describe('AssetStore', () => {
       ]);
       sdkMock.getTimeBucket.mockImplementation(({ timeBucket }) => Promise.resolve(bucketAssets[timeBucket]));
 
-      await assetStore.init({ width: 1588, height: 1000 });
+      await assetStore.init();
+      await assetStore.updateViewport({ width: 1588, height: 1000 });
     });
 
     it('should load buckets in viewport', () => {
@@ -72,7 +73,8 @@ describe('AssetStore', () => {
 
         return bucketAssets[timeBucket];
       });
-      await assetStore.init({ width: 0, height: 0 });
+      await assetStore.init();
+      await assetStore.updateViewport({ width: 0, height: 0 });
     });
 
     it('loads a bucket', async () => {
@@ -137,7 +139,8 @@ describe('AssetStore', () => {
     beforeEach(async () => {
       assetStore = new AssetStore({});
       sdkMock.getTimeBuckets.mockResolvedValue([]);
-      await assetStore.init({ width: 1588, height: 1000 });
+      await assetStore.init();
+      await assetStore.updateViewport({ width: 1588, height: 1000 });
     });
 
     it('is empty initially', () => {
@@ -219,7 +222,8 @@ describe('AssetStore', () => {
     beforeEach(async () => {
       assetStore = new AssetStore({});
       sdkMock.getTimeBuckets.mockResolvedValue([]);
-      await assetStore.init({ width: 1588, height: 1000 });
+      await assetStore.init();
+      await assetStore.updateViewport({ width: 1588, height: 1000 });
     });
 
     it('ignores non-existing assets', () => {
@@ -263,7 +267,8 @@ describe('AssetStore', () => {
     beforeEach(async () => {
       assetStore = new AssetStore({});
       sdkMock.getTimeBuckets.mockResolvedValue([]);
-      await assetStore.init({ width: 1588, height: 1000 });
+      await assetStore.init();
+      await assetStore.updateViewport({ width: 1588, height: 1000 });
     });
 
     it('ignores invalid IDs', () => {
@@ -312,7 +317,8 @@ describe('AssetStore', () => {
       ]);
       sdkMock.getTimeBucket.mockImplementation(({ timeBucket }) => Promise.resolve(bucketAssets[timeBucket]));
 
-      await assetStore.init({ width: 0, height: 0 });
+      await assetStore.init();
+      await assetStore.updateViewport({ width: 0, height: 0 });
     });
 
     it('returns null for invalid assetId', async () => {
@@ -368,7 +374,8 @@ describe('AssetStore', () => {
     beforeEach(async () => {
       assetStore = new AssetStore({});
       sdkMock.getTimeBuckets.mockResolvedValue([]);
-      await assetStore.init({ width: 0, height: 0 });
+      await assetStore.init();
+      await assetStore.updateViewport({ width: 0, height: 0 });
     });
 
     it('returns null for invalid buckets', () => {
