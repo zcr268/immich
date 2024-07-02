@@ -1,6 +1,6 @@
 {
   "name": "immich-e2e",
-  "version": "1.106.4",
+  "version": "1.107.1",
   "description": "",
   "main": "index.js",
   "type": "module",
@@ -23,7 +23,7 @@
     "@immich/sdk": "file:../open-api/typescript-sdk",
     "@playwright/test": "^1.44.1",
     "@types/luxon": "^3.4.2",
-    "@types/node": "^20.14.7",
+    "@types/node": "^20.14.9",
     "@types/pg": "^8.11.0",
     "@types/pngjs": "^6.0.4",
     "@types/supertest": "^6.0.2",
