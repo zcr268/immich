@@ -621,8 +621,6 @@
                 bucketHeight={bucket.bucketHeight}
                 viewport={safeViewport}
               />
-            {:else}
-              <p>nope</p>
             {/if}
           </div>
         </IntersectionObserver>
