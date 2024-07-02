@@ -47,11 +47,11 @@ export function currentUrlReplaceAssetId(assetId: string) {
     : `${$page.url.pathname.replace(/(\/photos.*)$/, '')}/photos/${assetId}${searchparams}`;
 }
 
-function replaceScrollTarget(url: string, searchParams: AssetGridRouteSearchParams) {
+function replaceScrollTarget(url: string, searchParams?: AssetGridRouteSearchParams | null) {
   const $page = get(page);
   const parsed = new URL(url, $page.url);
 
-  const { at: assetId } = searchParams;
+  const { at: assetId } = searchParams || { at: null };
 
   if (!assetId) {
     return parsed.pathname;
@@ -82,12 +82,14 @@ interface AssetRoute extends Route {
 interface AssetGridRoute extends Route {
   targetRoute: 'current';
   assetId: string | null | undefined;
-  assetGridRouteSearchParams: AssetGridRouteSearchParams;
+  assetGridRouteSearchParams: AssetGridRouteSearchParams | null | undefined;
 }
 
 type ImmichRoute = AssetRoute | AssetGridRoute;
 
 type NavOptions = {
+  /* navigate even if url is the same */
+  forceNavigate?: boolean | undefined;
   replaceState?: boolean | undefined;
   noScroll?: boolean | undefined;
   keepFocus?: boolean | undefined;
@@ -107,7 +109,7 @@ async function navigateAssetRoute(route: AssetRoute, options?: NavOptions) {
   const { assetId } = route;
   const next = assetId ? currentUrlReplaceAssetId(assetId) : currentUrlWithoutAsset();
   const current = currentUrl();
-  if (next !== current) {
+  if (next !== current || options?.forceNavigate) {
     await goto(next, options);
   }
 }
@@ -117,7 +119,7 @@ async function navigateAssetGridRoute(route: AssetGridRoute, options?: NavOption
   const assetUrl = assetId ? currentUrlReplaceAssetId(assetId) : currentUrlWithoutAsset();
   const next = replaceScrollTarget(assetUrl, assetGridScrollTarget);
   const current = currentUrl();
-  if (next !== current) {
+  if (next !== current || options?.forceNavigate) {
     await goto(next, options);
   }
 }
