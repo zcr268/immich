@@ -43,7 +43,7 @@
   export let onAssetInGrid: ((asset: AssetResponseDto) => void) | undefined = undefined;
   /* TODO figure out a way to calculate this*/
   const TITLE_HEIGHT = 51;
-  const ASSET_GRID_PADDING = 60;
+  // const ASSET_GRID_PADDING = 60;
   const LAYOUT_OPTIONS = {
     boxSpacing: 2,
     containerPadding: 0,
