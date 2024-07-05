@@ -34,7 +34,10 @@
 
   export let isSelectionMode = false;
   export let singleSelect = false;
-  export let partOfRoute: boolean;
+  /* true if this asset grid is responds to navigation events; if true, then look at the
+   * AssetViewingStore.gridScrollTarget and load and scroll to the asset specified, and
+   * additionally, update the page location/url with the asset as the asset-grid is scrolled */
+  export let participatesInRouting: boolean;
   export let assetStore: AssetStore;
   export let assetInteractionStore: AssetInteractionStore;
   export let removeAction: AssetAction | null = null;
@@ -135,7 +138,7 @@
       $assetStore.connect();
       void $assetStore.init().then(() => $assetStore.updateViewport(safeViewport));
     }
-    if (!partOfRoute) {
+    if (!participatesInRouting) {
       showSkeleton = false;
     }
     const dispose = hmrSupport();
@@ -185,7 +188,7 @@
   }
 
   const onAssetInGrid = async (asset: AssetResponseDto) => {
-    if (!partOfRoute || navigating) {
+    if (!participatesInRouting || navigating) {
       return;
     }
     $gridScrollTarget = { at: asset.id };

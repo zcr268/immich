@@ -546,14 +546,14 @@
       {#key albumKey}
         {#if viewMode === ViewMode.SELECT_ASSETS}
           <AssetGrid
-            partOfRoute={false}
+            participatesInRouting={false}
             assetStore={timelineStore}
             assetInteractionStore={timelineInteractionStore}
             isSelectionMode={true}
           />
         {:else}
           <AssetGrid
-            partOfRoute={true}
+            participatesInRouting={true}
             {album}
             {assetStore}
             {assetInteractionStore}

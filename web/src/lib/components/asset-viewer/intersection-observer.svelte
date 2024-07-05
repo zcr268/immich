@@ -25,8 +25,11 @@
 
       const observer = new IntersectionObserver(
         (entries) => {
+          // If the body of the IntersectionObserver component has multiple nodes, there
+          // will be an entry for each of them in entries, look for the entry that is actually
+          // intersecting.
           const intersectingEntry = entries.find((entry) => entry.isIntersecting);
-          intersecting = !!intersectingEntry;
+          intersecting = intersectingEntry ? true : false;
           if (!intersectingEntry) {
             dispatch('hidden', container);
           }

@@ -1,9 +1,17 @@
 let observer: ResizeObserver;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let callbacks: WeakMap<Element, (element: Element) => any>;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function resizeObserver(element: Element, onResize: (element: Element) => any) {
+let callbacks: WeakMap<Element, (element: Element) => void>;
+
+/**
+ * Installs a resizeObserver on the given element - when the element changes size, invokes a callback
+ * function with the width/height. Intended as a replacement for bind:clientWidth and
+ * bind:clientHeight in svelte4 which use an iframe to measure the size of the element, which can be
+ * bad for performance and memory usage. In svelte5, they adapted bind:clientHeight and
+ * bind:clientWidth to use an internal resize observer.
+ *
+ * TODO: When svelte5 is ready, go back to bind:clientWidth and bind:clientHeight.
+ */
+export function resizeObserver(element: Element, onResize: (element: Element) => void) {
   if (!observer) {
     callbacks = new WeakMap();
     observer = new ResizeObserver((entries) => {

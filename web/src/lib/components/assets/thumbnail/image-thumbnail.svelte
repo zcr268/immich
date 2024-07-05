@@ -33,7 +33,9 @@
     const onerror = () => {
       error = true;
     };
-    img.complete ? onload() : void 0;
+    if (img.complete) {
+      onload();
+    }
     img.addEventListener('load', onload);
     img.addEventListener('error', onerror);
     return () => {

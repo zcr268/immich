@@ -34,17 +34,17 @@ export class AssetBucket {
    * The DOM height of the bucket in pixel
    * This value is first estimated by the number of asset and later is corrected as the user scroll
    */
-  bucketHeight = 0;
-  bucketHeightActual = false;
+  bucketHeight: number = 0;
+  isBucketHeightActual: boolean = false;
   bucketDate!: string;
-  bucketCount = 0;
+  bucketCount: number = 0;
   assets: AssetResponseDto[] = [];
   cancelToken: AbortController | null = null;
   position: BucketPosition = BucketPosition.Unknown;
   /**
    * Prevent this asset's load from being canceled; i.e. to force load of offscreen asset.
    */
-  preventCancel: boolean = false;
+  isPreventCancel: boolean = false;
   /**
    * A promise that resolves once the bucket is loaded, and rejects if bucket is canceled.
    */
@@ -56,29 +56,34 @@ export class AssetBucket {
   }
 
   private init() {
+    // create a promise, and store its resolve/reject callbacks. The loadedSignal callback
+    // will be incoked when a bucket is loaded, fulfilling the promise. The canceledSignal
+    // callback will be called if the bucket is canceled before it was loaded, rejecting the
+    // promise.
     this.complete = new Promise((resolve, reject) => {
-      this.$loadedSignal = resolve;
-      this.$canceledSignal = reject;
+      this.loadedSignal = resolve;
+      this.canceledSignal = reject;
     });
-    // supress uncaught rejection
+    // if no-one waits on complete, and its rejected a uncaught rejection message is logged.
+    // We this message with an empty reject handler, since waiting on a bucket is optional.
     this.complete.catch(() => void 0);
   }
 
-  private $loadedSignal!: () => void;
-  private $canceledSignal!: () => void;
+  private loadedSignal!: () => void;
+  private canceledSignal!: () => void;
 
   cancel() {
-    if (this.preventCancel) {
+    if (this.isPreventCancel) {
       return;
     }
     this.position = BucketPosition.Unknown;
     this.cancelToken?.abort();
-    this.$canceledSignal;
+    this.canceledSignal;
     this.init();
   }
 
   loaded() {
-    this.$loadedSignal();
+    this.loadedSignal();
   }
 }
 
@@ -122,7 +127,7 @@ export class AssetStore {
     width: 0,
   };
 
-  private $initializedSignal!: () => void;
+  private initializedSignal!: () => void;
   /**
    * A promise that resolves once the bucket is loaded, and rejects if bucket is canceled.
    */
@@ -238,9 +243,10 @@ export class AssetStore {
     if (this.initialized) {
       throw 'Can only init once';
     }
-
+    // create a promise, and store its resolve callbacks. The initializedSignal callback
+    // will be invoked when a the assetstore is initialized.
     this.complete = new Promise((resolve) => {
-      this.$initializedSignal = resolve;
+      this.initializedSignal = resolve;
     });
     //  uncaught rejection go away
     this.complete.catch(() => void 0);
@@ -258,7 +264,7 @@ export class AssetStore {
     this.buckets = timebuckets.map(
       (bucket) => new AssetBucket({ bucketDate: bucket.timeBucket, bucketCount: bucket.count }),
     );
-    this.$initializedSignal();
+    this.initializedSignal();
     this.initialized = true;
   }
 
@@ -272,7 +278,7 @@ export class AssetStore {
     this.viewport = { ...viewport };
 
     for (const bucket of this.buckets) {
-      if (bucket.bucketHeightActual) {
+      if (bucket.isBucketHeightActual) {
         continue;
       }
       const unwrappedWidth = (3 / 2) * bucket.bucketCount * THUMBNAIL_HEIGHT * (7 / 10);
@@ -310,13 +316,13 @@ export class AssetStore {
 
     if (bucket.cancelToken != null && bucket.bucketCount !== bucket.assets.length) {
       // if promise is pending, and preventCancel is requested, then don't overwrite it
-      if (!bucket.preventCancel) {
-        bucket.preventCancel = !!preventCancel;
+      if (!bucket.isPreventCancel) {
+        bucket.isPreventCancel = !!preventCancel;
       }
       await bucket.complete;
       return;
     }
-    bucket.preventCancel = !!preventCancel;
+    bucket.isPreventCancel = !!preventCancel;
 
     const cancelToken = (bucket.cancelToken = new AbortController());
     try {
@@ -368,7 +374,7 @@ export class AssetStore {
       return 0;
     }
 
-    bucket.bucketHeightActual = true;
+    bucket.isBucketHeightActual = true;
     const delta = height - bucket.bucketHeight;
     const scrollTimeline = bucket.position == BucketPosition.Above;
 

@@ -208,10 +208,11 @@
             class="absolute"
             style="width: {box.width}px; height: {box.height}px; top: {box.top}px; left: {box.left}px"
           >
+            <!-- TODO: safari has a bug, need to substract padding for the bottom margin (ASSET_GRID_PADDING) -->
             <IntersectionObserver
               root={assetGridElement}
               top={`-${TITLE_HEIGHT}px`}
-              bottom={`-${viewport.height - TITLE_HEIGHT - ASSET_GRID_PADDING - 1}px`}
+              bottom={`-${viewport.height - TITLE_HEIGHT - 1}px`}
               right={`-${viewport.width - 1}px`}
               once={false}
               on:intersected={() => onAssetInGrid?.(asset)}
