@@ -143,6 +143,13 @@
 <!-- svelte-ignore a11y-missing-attribute -->
 <img bind:this={loader} style="display:none" src={imageLoaderUrl} aria-hidden="true" />
 <div bind:this={element} class="relative h-full select-none">
+  <img
+    style="display:none"
+    src={imageLoaderUrl}
+    alt={$getAltText(asset)}
+    on:load={() => ((imageLoaded = true), (assetFileUrl = imageLoaderUrl))}
+    on:error={() => (imageError = imageLoaded = true)}
+  />
   {#if !imageLoaded}
     <div id="spinner" class="flex h-full items-center justify-center">
       <LoadingSpinner />
@@ -152,7 +159,7 @@
       {#if $slideshowState !== SlideshowState.None && $slideshowLook === SlideshowLook.BlurredBackground}
         <img
           src={assetFileUrl}
-          alt={getAltText(asset)}
+          alt={$getAltText(asset)}
           class="absolute top-0 left-0 -z-10 object-cover h-full w-full blur-lg"
           draggable="false"
         />
@@ -160,7 +167,7 @@
       <img
         bind:this={$photoViewer}
         src={assetFileUrl}
-        alt={getAltText(asset)}
+        alt={$getAltText(asset)}
         class="h-full w-full {$slideshowState === SlideshowState.None
           ? 'object-contain'
           : slideshowLookCssMapping[$slideshowLook]}"
