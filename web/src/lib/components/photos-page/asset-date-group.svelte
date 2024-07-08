@@ -16,18 +16,15 @@
   import type { AssetResponseDto } from '@immich/sdk';
   import { mdiCheckCircle, mdiCircleOutline } from '@mdi/js';
   import justifiedLayout from 'justified-layout';
-  import { createEventDispatcher, tick } from 'svelte';
+  import { createEventDispatcher } from 'svelte';
   import { fly } from 'svelte/transition';
   import Thumbnail from '../assets/thumbnail/thumbnail.svelte';
-  import { handlePromiseError } from '$lib/utils';
 
   import { navigate } from '$lib/utils/navigation';
   import { resizeObserver } from '$lib/actions/resize-observer';
 
   export let element: HTMLElement | undefined = undefined;
-  export let assets: AssetResponseDto[];
-  export let bucketDate: string;
-  export let bucketHeight: number;
+
   export let isSelectionMode = false;
   export let viewport: Viewport;
   export let singleSelect = false;
@@ -37,10 +34,16 @@
   export let renderThumbsAtBottomMargin: string | undefined = undefined;
   export let renderThumbsAtTopMargin: string | undefined = undefined;
   export let assetStore: AssetStore;
+  export let bucket: AssetBucket;
   export let assetInteractionStore: AssetInteractionStore;
-  export let onScrollTarget: (({ target, offset }: { target: AssetBucket; offset: number }) => void) | undefined =
-    undefined;
+  export let onScrollTarget: (({ offset }: { offset: number }) => void) | undefined = undefined;
   export let onAssetInGrid: ((asset: AssetResponseDto) => void) | undefined = undefined;
+  export let onBucketHeight: (bucket: AssetBucket, height: number) => void;
+
+  $: assets = bucket.assets;
+  $: bucketDate = bucket.bucketDate;
+  $: bucketHeight = bucket.bucketHeight;
+
   /* TODO figure out a way to calculate this*/
   const TITLE_HEIGHT = 51;
   // const ASSET_GRID_PADDING = 60;
@@ -82,9 +85,7 @@
     const sectionOffset = section.offsetTop;
     const offset = offsetFromImageGrid + previousSections + sectionOffset - TITLE_HEIGHT;
 
-    const bucket = $assetStore.buckets.find((bucket) => bucket.bucketDate === section.dataset.bucketDate);
-
-    onScrollTarget?.({ target: bucket!, offset });
+    onScrollTarget?.({ offset });
   };
 
   $: {
@@ -109,17 +110,8 @@
 
   $: {
     if (actualBucketHeight && actualBucketHeight !== 0 && actualBucketHeight != bucketHeight) {
-      const heightDelta = assetStore.updateBucket(bucketDate, actualBucketHeight);
-      if (heightDelta !== 0) {
-        handlePromiseError(tick().then(() => scrollTimeline(heightDelta)));
-      }
+      onBucketHeight(bucket, actualBucketHeight);
     }
-  }
-
-  function scrollTimeline(heightDelta: number) {
-    dispatch('shift', {
-      heightDelta,
-    });
   }
 
   const handleSelectGroup = (title: string, assets: AssetResponseDto[]) => dispatch('select', { title, assets });

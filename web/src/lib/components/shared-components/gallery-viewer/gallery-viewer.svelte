@@ -2,7 +2,7 @@
   import Portal from '../portal/portal.svelte';
   import Thumbnail from '$lib/components/assets/thumbnail/thumbnail.svelte';
   import { assetViewingStore } from '$lib/stores/asset-viewing.store';
-  import type { BucketPosition, Viewport } from '$lib/stores/assets.store';
+  import type { Viewport } from '$lib/stores/assets.store';
   import { handleError } from '$lib/utils/handle-error';
   import { type AssetResponseDto } from '@immich/sdk';
   import { createEventDispatcher, onDestroy } from 'svelte';
@@ -16,7 +16,7 @@
   import { handlePromiseError } from '$lib/utils';
   import { t } from 'svelte-i18n';
 
-  const dispatch = createEventDispatcher<{ intersected: { container: HTMLDivElement; position: BucketPosition } }>();
+  const dispatch = createEventDispatcher<{ intersected: { container: HTMLDivElement } }>();
 
   export let assets: AssetResponseDto[];
   export let selectedAssets: Set<AssetResponseDto> = new Set();

@@ -4,13 +4,7 @@
   import { AppRoute, AssetAction } from '$lib/constants';
   import type { AssetInteractionStore } from '$lib/stores/asset-interaction.store';
   import { assetViewingStore } from '$lib/stores/asset-viewing.store';
-  import {
-    AssetBucket,
-    AssetStore,
-    BucketPosition,
-    isSelectingAllAssets,
-    type Viewport,
-  } from '$lib/stores/assets.store';
+  import { AssetBucket, AssetStore, isSelectingAllAssets, type Viewport } from '$lib/stores/assets.store';
   import { locale, showDeleteModal } from '$lib/stores/preferences.store';
   import { isSearchEnabled } from '$lib/stores/search.store';
   import { featureFlags } from '$lib/stores/server-config.store';
@@ -19,7 +13,7 @@
   import { formatGroupTitle, splitBucketIntoDateGroups } from '$lib/utils/timeline-util';
   import type { AlbumResponseDto, AssetResponseDto } from '@immich/sdk';
   import { DateTime } from 'luxon';
-  import { createEventDispatcher, onMount } from 'svelte';
+  import { afterUpdate, createEventDispatcher, onMount } from 'svelte';
   import IntersectionObserver from '../asset-viewer/intersection-observer.svelte';
   import Portal from '../shared-components/portal/portal.svelte';
   import Scrollbar from '../shared-components/scrollbar/scrollbar.svelte';
@@ -56,6 +50,7 @@
   let { isViewing: showAssetViewer, asset: viewingAsset, preloadAssets, gridScrollTarget } = assetViewingStore;
 
   let element: HTMLElement;
+  let timelineElement: HTMLElement;
   let showShortcuts = false;
   let showSkeleton = true;
   let assetGroupCmp: AssetDateGroup[] = [];
@@ -179,14 +174,6 @@
   };
   const handleTimelineScroll = wrapRAF(scrollTimelineY);
 
-  // do not put this in a RAF - RAF will skip some of the events
-  // if they are sent in quick successtion. This event is sent
-  // by the date-group to maintain scroll position, and every
-  // event must be delivered.
-  function handleScrollTimeline(event: CustomEvent) {
-    element.scrollBy(0, event.detail.heightDelta);
-  }
-
   const onAssetInGrid = async (asset: AssetResponseDto) => {
     if (!participatesInRouting || navigating) {
       return;
@@ -199,17 +186,7 @@
     );
   };
 
-  const scrollToTarget = ({ target, offset }: { target: AssetBucket; offset: number }) => {
-    const buckets = $assetStore.buckets;
-
-    // Set 'above' to all bucket positions above the target so that in case they
-    // are loaded, the scroll positions are maintained
-    for (const bucket of buckets) {
-      if (bucket === target) {
-        break;
-      }
-      bucket.position = BucketPosition.Above;
-    }
+  const scrollToTarget = ({ offset }: { offset: number }) => {
     internalScroll = true;
     element.scrollTo({ top: offset });
     $assetStore.clearPendingScroll();
@@ -298,6 +275,38 @@
       assetInteractionStore.selectAsset(asset);
     }
   };
+
+  let intersectingBucketElement: HTMLElement;
+  let intersectingBucketElementOriginalTop = 0;
+  let updateReasonIsBucketResize = false;
+
+  afterUpdate(() => {
+    if (updateReasonIsBucketResize) {
+      const bounds = intersectingBucketElement.getBoundingClientRect();
+      if (intersectingBucketElementOriginalTop !== bounds.top) {
+        const delta = bounds.top - intersectingBucketElementOriginalTop;
+        // do not put this in a RAF - RAF will skip some of the events
+        // if they are sent in quick successtion. This event is sent
+        // by the date-group to maintain scroll position, and every
+        // event must be delivered.
+        element.scrollBy(0, delta);
+      }
+      updateReasonIsBucketResize = false;
+    }
+  });
+
+  function onBucketHeight(bucket: AssetBucket, actualBucketHeight: number) {
+    $assetStore.updateBucket(bucket.bucketDate, actualBucketHeight);
+    updateReasonIsBucketResize = true;
+    for (const child of timelineElement.children) {
+      const bottom = child.getBoundingClientRect().bottom;
+      if (bottom > 80.5) {
+        intersectingBucketElement = child as HTMLElement;
+        intersectingBucketElementOriginalTop = child.getBoundingClientRect().top;
+        break;
+      }
+    }
+  }
 
   function intersectedHandler(event: CustomEvent) {
     const element_ = event.detail.container as HTMLElement;
@@ -479,7 +488,7 @@
       // Select/deselect assets in all intermediate buckets
       for (let bucketIndex = startBucketIndex + 1; bucketIndex < endBucketIndex; bucketIndex++) {
         const bucket = $assetStore.buckets[bucketIndex];
-        await $assetStore.loadBucket(bucket.bucketDate, BucketPosition.Unknown);
+        await $assetStore.loadBucket(bucket.bucketDate);
         for (const asset of bucket.assets) {
           if (deselect) {
             assetInteractionStore.removeAssetFromMultiselectGroup(asset);
@@ -568,18 +577,6 @@
   bind:this={element}
   on:scroll={handleTimelineScroll}
 >
-  <!-- skeleton -->
-  {#if showSkeleton}
-    <div id="skeleton" class="absolute top-0 object-cover mt-8 animate-pulse">
-      <div class="mb-2 h-4 w-24 rounded-full bg-immich-primary/20 dark:bg-immich-dark-primary/20" />
-      <div class="flex w-[120%] flex-wrap">
-        {#each Array.from({ length: 100 }) as _}
-          <div class="m-[1px] h-[10em] w-[16em] bg-immich-primary/20 dark:bg-immich-dark-primary/20" />
-        {/each}
-      </div>
-    </div>
-  {/if}
-
   {#if element}
     <div class:invisible={showSkeleton}>
       <slot />
@@ -589,7 +586,12 @@
       {/if}
     </div>
 
-    <section id="virtual-timeline" class:invisible={showSkeleton} style:height={$assetStore.timelineHeight + 'px'}>
+    <section
+      bind:this={timelineElement}
+      id="virtual-timeline"
+      class:invisible={showSkeleton}
+      style:height={$assetStore.timelineHeight + 'px'}
+    >
       {#each $assetStore.buckets as bucket, index (bucket.bucketDate)}
         <IntersectionObserver
           on:intersected={intersectedHandler}
@@ -600,7 +602,22 @@
           root={element}
         >
           {@const showGroup = intersecting || bucket === $assetStore.pendingScrollBucket}
-          <div data-bucket-date={bucket.bucketDate} style:height={bucket.bucketHeight + 'px'}>
+          <div data-bucket-date={bucket.bucketDate} class="overflow-clip" style:height={bucket.bucketHeight + 'px'}>
+            {#if !bucket.isLoaded}
+              {@const unwrappedWidth = ((3 / 2) * bucket.bucketCount * 235 * (7 / 10)) / 235}
+              <div id="skeleton" class="animate-pulse overflow-clip">
+                <div
+                  class="flex z-[100] sticky top-0 pt-7 pb-5 h-6 place-items-center text-xs font-medium text-immich-fg bg-immich-bg dark:bg-immich-dark-bg dark:text-immich-dark-fg md:text-sm"
+                >
+                  <span class="w-full truncate first-letter:capitalize">About {bucket.bucketDateFormattted}</span>
+                </div>
+                <div class="flex flex-wrap">
+                  {#each Array.from({ length: unwrappedWidth }) as _}
+                    <div class="m-[1px] h-[235px] w-[235px] bg-immich-primary/20 dark:bg-immich-dark-primary/20" />
+                  {/each}
+                </div>
+              </div>
+            {/if}
             {#if showGroup}
               <AssetDateGroup
                 assetGridElement={element}
@@ -614,14 +631,12 @@
                 {isSelectionMode}
                 {singleSelect}
                 on:select={({ detail: group }) => handleGroupSelect(group.title, group.assets)}
-                on:shift={handleScrollTimeline}
                 on:selectAssetCandidates={({ detail: asset }) => handleSelectAssetCandidates(asset)}
                 on:selectAssets={({ detail: asset }) => handleSelectAssets(asset)}
                 onScrollTarget={scrollToTarget}
                 {onAssetInGrid}
-                assets={bucket.assets}
-                bucketDate={bucket.bucketDate}
-                bucketHeight={bucket.bucketHeight}
+                {onBucketHeight}
+                {bucket}
                 viewport={safeViewport}
               />
             {/if}
@@ -655,16 +670,5 @@
   #asset-grid {
     contain: layout;
     scrollbar-width: none;
-  }
-  @keyframes delayedVisibility {
-    to {
-      visibility: visible;
-    }
-  }
-  #skeleton {
-    visibility: hidden;
-    animation:
-      0s linear 0.3s forwards delayedVisibility,
-      pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 </style>

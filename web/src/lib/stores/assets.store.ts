@@ -1,6 +1,6 @@
 import { getKey } from '$lib/utils';
 import type { AssetGridRouteSearchParams } from '$lib/utils/navigation';
-import { fromLocalDateTime } from '$lib/utils/timeline-util';
+import { formatGroupTitle, fromLocalDateTime } from '$lib/utils/timeline-util';
 import { TimeBucketSize, getAssetInfo, getTimeBucket, getTimeBuckets, type AssetResponseDto } from '@immich/sdk';
 import { throttle } from 'lodash-es';
 import { DateTime } from 'luxon';
@@ -9,12 +9,6 @@ import { get, writable, type Unsubscriber } from 'svelte/store';
 import { handleError } from '../utils/handle-error';
 import { websocketEvents } from './websocket';
 
-export enum BucketPosition {
-  Above = 'above',
-  Below = 'below',
-  Visible = 'visible',
-  Unknown = 'unknown',
-}
 type AssetApiGetTimeBucketsRequest = Parameters<typeof getTimeBuckets>[0];
 export type AssetStoreOptions = Omit<AssetApiGetTimeBucketsRequest, 'size'>;
 
@@ -37,10 +31,11 @@ export class AssetBucket {
   bucketHeight: number = 0;
   isBucketHeightActual: boolean = false;
   bucketDate!: string;
+  bucketDateFormattted!: string;
   bucketCount: number = 0;
   assets: AssetResponseDto[] = [];
   cancelToken: AbortController | null = null;
-  position: BucketPosition = BucketPosition.Unknown;
+
   /**
    * Prevent this asset's load from being canceled; i.e. to force load of offscreen asset.
    */
@@ -49,6 +44,7 @@ export class AssetBucket {
    * A promise that resolves once the bucket is loaded, and rejects if bucket is canceled.
    */
   complete!: Promise<void>;
+  isLoaded: boolean = false;
 
   constructor(props: Partial<AssetBucket> & { bucketDate: string }) {
     Object.assign(this, props);
@@ -67,6 +63,7 @@ export class AssetBucket {
     // if no-one waits on complete, and its rejected a uncaught rejection message is logged.
     // We this message with an empty reject handler, since waiting on a bucket is optional.
     this.complete.catch(() => void 0);
+    this.bucketDateFormattted = formatGroupTitle(fromLocalDateTime(this.bucketDate).startOf('month'));
   }
 
   private loadedSignal!: () => void;
@@ -76,7 +73,7 @@ export class AssetBucket {
     if (this.isPreventCancel) {
       return;
     }
-    this.position = BucketPosition.Unknown;
+
     this.cancelToken?.abort();
     this.canceledSignal;
     this.init();
@@ -84,6 +81,7 @@ export class AssetBucket {
 
   loaded() {
     this.loadedSignal();
+    this.isLoaded = true;
   }
 }
 
@@ -295,20 +293,17 @@ export class AssetStore {
         break;
       }
       height += bucket.bucketHeight;
-      loaders.push(this.loadBucket(bucket.bucketDate, BucketPosition.Visible));
+      loaders.push(this.loadBucket(bucket.bucketDate));
     }
     await Promise.all(loaders);
   }
 
-  async loadBucket(bucketDate: string, position: BucketPosition, preventCancel?: boolean): Promise<void> {
+  async loadBucket(bucketDate: string, preventCancel?: boolean): Promise<void> {
     const bucket = this.getBucketByDate(bucketDate);
     if (!bucket) {
       return;
     }
-    if (bucket.position === BucketPosition.Unknown) {
-      // don't overwrite position if known
-      bucket.position = position;
-    }
+
     if (bucket.bucketCount === bucket.assets.length) {
       // already loaded
       return;
@@ -358,8 +353,8 @@ export class AssetStore {
       }
 
       bucket.assets = assets;
-      this.emit(true);
       bucket.loaded();
+      this.emit(true);
     } catch (error) {
       const $t = get(t);
       handleError(error, $t('errors.failed_to_load_assets'));
@@ -371,19 +366,13 @@ export class AssetStore {
   updateBucket(bucketDate: string, height: number) {
     const bucket = this.getBucketByDate(bucketDate);
     if (!bucket) {
-      return 0;
+      return;
     }
-
     bucket.isBucketHeightActual = true;
     const delta = height - bucket.bucketHeight;
-    const scrollTimeline = bucket.position == BucketPosition.Above;
-
     bucket.bucketHeight = height;
-    bucket.position = BucketPosition.Unknown;
-
     this.timelineHeight += delta;
     this.emit(false);
-    return scrollTimeline ? delta : 0;
   }
 
   addAssets(assets: AssetResponseDto[]) {
@@ -501,7 +490,7 @@ export class AssetStore {
       date = date.set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
     }
     const iso = date.toISO()!;
-    await this.loadBucket(iso, BucketPosition.Unknown, preventCancel);
+    await this.loadBucket(iso, preventCancel);
     return this.getBucketByDate(iso);
   }
 
@@ -527,7 +516,7 @@ export class AssetStore {
     );
     for (const bucket of this.buckets) {
       if (index < bucket.bucketCount) {
-        await this.loadBucket(bucket.bucketDate, BucketPosition.Unknown);
+        await this.loadBucket(bucket.bucketDate);
         return bucket.assets[index] || null;
       }
 
@@ -601,7 +590,7 @@ export class AssetStore {
     }
 
     const previousBucket = this.buckets[bucketIndex - 1];
-    await this.loadBucket(previousBucket.bucketDate, BucketPosition.Unknown);
+    await this.loadBucket(previousBucket.bucketDate);
     return previousBucket.assets.at(-1) || null;
   }
 
@@ -622,7 +611,7 @@ export class AssetStore {
     }
 
     const nextBucket = this.buckets[bucketIndex + 1];
-    await this.loadBucket(nextBucket.bucketDate, BucketPosition.Unknown);
+    await this.loadBucket(nextBucket.bucketDate);
     return nextBucket.assets[0] || null;
   }
 

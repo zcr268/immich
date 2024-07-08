@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { BucketPosition } from '$lib/stores/assets.store';
   import { createEventDispatcher, onMount } from 'svelte';
 
   export let once = false;
@@ -15,7 +14,6 @@
     hidden: HTMLDivElement;
     intersected: {
       container: HTMLDivElement;
-      position: BucketPosition;
     };
   }>();
 
@@ -39,28 +37,8 @@
           }
 
           if (intersectingEntry) {
-            let position: BucketPosition = BucketPosition.Visible;
-            if (root) {
-              const view = root.getBoundingClientRect();
-              const entry = intersectingEntry.boundingClientRect;
-              if (entry.top > view.top + view.height) {
-                position = BucketPosition.Below;
-              } else if (entry.bottom + entry.height < view.top) {
-                position = BucketPosition.Above;
-              } else {
-                position = BucketPosition.Visible;
-              }
-            } else {
-              // no viewport, use the intersectionRect for calculations
-              if (intersectingEntry.boundingClientRect.top + 50 > intersectingEntry.intersectionRect.bottom) {
-                position = BucketPosition.Below;
-              } else if (intersectingEntry.boundingClientRect.bottom < 0) {
-                position = BucketPosition.Above;
-              }
-            }
             dispatch('intersected', {
               container,
-              position,
             });
           }
         },
