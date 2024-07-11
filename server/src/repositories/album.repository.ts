@@ -272,7 +272,7 @@ export class AlbumRepository implements IAlbumRepository {
   }
 
   async delete(album: AlbumEntity): Promise<void> {
-    await this.repository.remove(album);
+    await this.repository.delete({ id: album.id });
   }
 
   private async save(album: Partial<AlbumEntity>) {
