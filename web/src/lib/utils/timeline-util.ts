@@ -36,6 +36,9 @@ export type ScrollTargetListener = ({
 export const fromLocalDateTime = (localDateTime: string) =>
   DateTime.fromISO(localDateTime, { zone: 'UTC', locale: get(locale) });
 
+export const fromDateTimeOriginal = (dateTimeOriginal: string, timeZone: string) =>
+  DateTime.fromISO(dateTimeOriginal, { zone: timeZone });
+
 export const groupDateFormat: Intl.DateTimeFormatOptions = {
   weekday: 'short',
   month: 'short',
@@ -107,7 +110,7 @@ export function splitBucketIntoDateGroups(bucket: AssetBucket, locale: string | 
       heightActual: false,
       intersecting: false,
       geometry: emptyGeometry(),
-      bucket: bucket,
+      bucket,
     };
   });
 }

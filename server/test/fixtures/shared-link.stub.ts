@@ -5,7 +5,7 @@ import { SharedLinkResponseDto } from 'src/dtos/shared-link.dto';
 import { mapUser } from 'src/dtos/user.dto';
 import { SharedLinkEntity } from 'src/entities/shared-link.entity';
 import { UserEntity } from 'src/entities/user.entity';
-import { AssetOrder, AssetType, SharedLinkType } from 'src/enum';
+import { AssetOrder, AssetStatus, AssetType, SharedLinkType } from 'src/enum';
 import { assetStub } from 'test/fixtures/asset.stub';
 import { authStub } from 'test/fixtures/auth.stub';
 import { userStub } from 'test/fixtures/user.stub';
@@ -54,7 +54,6 @@ const assetResponse: AssetResponseDto = {
   originalMimeType: 'image/jpeg',
   originalPath: 'fake_path/jpeg',
   originalFileName: 'asset_1.jpeg',
-  resized: false,
   thumbhash: null,
   fileModifiedAt: today,
   isOffline: false,
@@ -82,7 +81,6 @@ const assetResponseWithoutMetadata = {
   id: 'id_1',
   type: AssetType.VIDEO,
   originalMimeType: 'image/jpeg',
-  resized: false,
   thumbhash: null,
   localDateTime: today,
   duration: '0:00:00.00000',
@@ -190,6 +188,7 @@ export const sharedLinkStub = {
       assets: [
         {
           id: 'id_1',
+          status: AssetStatus.ACTIVE,
           owner: undefined as unknown as UserEntity,
           ownerId: 'user_id_1',
           deviceAssetId: 'device_asset_id_1',

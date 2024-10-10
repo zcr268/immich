@@ -6,7 +6,9 @@ import {
   LoginResponseDto,
   SharedLinkType,
   getAssetInfo,
+  getConfig,
   getMyUser,
+  updateConfig,
 } from '@immich/sdk';
 import { exiftool } from 'exiftool-vendored';
 import { DateTime } from 'luxon';
@@ -43,6 +45,9 @@ const TEN_TIMES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 const locationAssetFilepath = `${testAssetDir}/metadata/gps-position/thompson-springs.jpg`;
 const ratingAssetFilepath = `${testAssetDir}/metadata/rating/mongolels.jpg`;
+const facesAssetFilepath = `${testAssetDir}/metadata/faces/portrait.jpg`;
+
+const getSystemConfig = (accessToken: string) => getConfig({ headers: asBearerAuth(accessToken) });
 
 const readTags = async (bytes: Buffer, filename: string) => {
   const filepath = join(tempDir, filename);
@@ -222,6 +227,64 @@ describe('/asset', () => {
         id: ratingAsset.id,
         exifInfo: expect.objectContaining({ rating: 3 }),
       });
+    });
+
+    it('should get the asset faces', async () => {
+      const config = await getSystemConfig(admin.accessToken);
+      config.metadata.faces.import = true;
+      await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+
+      // asset faces
+      const facesAsset = await utils.createAsset(admin.accessToken, {
+        assetData: {
+          filename: 'portrait.jpg',
+          bytes: await readFile(facesAssetFilepath),
+        },
+      });
+
+      await utils.waitForWebsocketEvent({ event: 'assetUpload', id: facesAsset.id });
+
+      const { status, body } = await request(app)
+        .get(`/assets/${facesAsset.id}`)
+        .set('Authorization', `Bearer ${admin.accessToken}`);
+      expect(status).toBe(200);
+      expect(body.id).toEqual(facesAsset.id);
+      expect(body.people).toMatchObject([
+        {
+          name: 'Marie Curie',
+          birthDate: null,
+          thumbnailPath: '',
+          isHidden: false,
+          faces: [
+            {
+              imageHeight: 700,
+              imageWidth: 840,
+              boundingBoxX1: 261,
+              boundingBoxX2: 356,
+              boundingBoxY1: 146,
+              boundingBoxY2: 284,
+              sourceType: 'exif',
+            },
+          ],
+        },
+        {
+          name: 'Pierre Curie',
+          birthDate: null,
+          thumbnailPath: '',
+          isHidden: false,
+          faces: [
+            {
+              imageHeight: 700,
+              imageWidth: 840,
+              boundingBoxX1: 536,
+              boundingBoxX2: 618,
+              boundingBoxY1: 83,
+              boundingBoxY2: 252,
+              sourceType: 'exif',
+            },
+          ],
+        },
+      ]);
     });
 
     it('should work with a shared link', async () => {
@@ -479,6 +542,48 @@ describe('/asset', () => {
         }),
       });
       expect(status).toEqual(200);
+    });
+
+    it('should not allow linking two photos', async () => {
+      const { status, body } = await request(app)
+        .put(`/assets/${user1Assets[0].id}`)
+        .set('Authorization', `Bearer ${user1.accessToken}`)
+        .send({ livePhotoVideoId: user1Assets[1].id });
+
+      expect(body).toEqual(errorDto.badRequest('Live photo video must be a video'));
+      expect(status).toEqual(400);
+    });
+
+    it('should not allow linking a video owned by another user', async () => {
+      const asset = await utils.createAsset(user2.accessToken, { assetData: { filename: 'example.mp4' } });
+      const { status, body } = await request(app)
+        .put(`/assets/${user1Assets[0].id}`)
+        .set('Authorization', `Bearer ${user1.accessToken}`)
+        .send({ livePhotoVideoId: asset.id });
+
+      expect(body).toEqual(errorDto.badRequest('Live photo video does not belong to the user'));
+      expect(status).toEqual(400);
+    });
+
+    it('should link a motion photo', async () => {
+      const asset = await utils.createAsset(user1.accessToken, { assetData: { filename: 'example.mp4' } });
+      const { status, body } = await request(app)
+        .put(`/assets/${user1Assets[0].id}`)
+        .set('Authorization', `Bearer ${user1.accessToken}`)
+        .send({ livePhotoVideoId: asset.id });
+
+      expect(status).toEqual(200);
+      expect(body).toMatchObject({ id: user1Assets[0].id, livePhotoVideoId: asset.id });
+    });
+
+    it('should unlink a motion photo', async () => {
+      const { status, body } = await request(app)
+        .put(`/assets/${user1Assets[0].id}`)
+        .set('Authorization', `Bearer ${user1.accessToken}`)
+        .send({ livePhotoVideoId: null });
+
+      expect(status).toEqual(200);
+      expect(body).toMatchObject({ id: user1Assets[0].id, livePhotoVideoId: null });
     });
 
     it('should update date time original when sidecar file contains DateTimeOriginal', async () => {
@@ -843,7 +948,6 @@ describe('/asset', () => {
         expected: {
           type: AssetTypeEnum.Image,
           originalFileName: '8bit-sRGB.avif',
-          resized: true,
           exifInfo: {
             description: '',
             exifImageHeight: 1080,
@@ -859,7 +963,6 @@ describe('/asset', () => {
         expected: {
           type: AssetTypeEnum.Image,
           originalFileName: 'el_torcal_rocks.jpg',
-          resized: true,
           exifInfo: {
             dateTimeOriginal: '2012-08-05T11:39:59.000Z',
             exifImageWidth: 512,
@@ -883,7 +986,6 @@ describe('/asset', () => {
         expected: {
           type: AssetTypeEnum.Image,
           originalFileName: '8bit-sRGB.jxl',
-          resized: true,
           exifInfo: {
             description: '',
             exifImageHeight: 1080,
@@ -899,7 +1001,6 @@ describe('/asset', () => {
         expected: {
           type: AssetTypeEnum.Image,
           originalFileName: 'IMG_2682.heic',
-          resized: true,
           fileCreatedAt: '2019-03-21T16:04:22.348Z',
           exifInfo: {
             dateTimeOriginal: '2019-03-21T16:04:22.348Z',
@@ -924,7 +1025,6 @@ describe('/asset', () => {
         expected: {
           type: AssetTypeEnum.Image,
           originalFileName: 'density_plot.png',
-          resized: true,
           exifInfo: {
             exifImageWidth: 800,
             exifImageHeight: 800,
@@ -939,7 +1039,6 @@ describe('/asset', () => {
         expected: {
           type: AssetTypeEnum.Image,
           originalFileName: 'glarus.nef',
-          resized: true,
           fileCreatedAt: '2010-07-20T17:27:12.000Z',
           exifInfo: {
             make: 'NIKON CORPORATION',
@@ -961,7 +1060,6 @@ describe('/asset', () => {
         expected: {
           type: AssetTypeEnum.Image,
           originalFileName: 'philadelphia.nef',
-          resized: true,
           fileCreatedAt: '2016-09-22T22:10:29.060Z',
           exifInfo: {
             make: 'NIKON CORPORATION',
@@ -984,7 +1082,6 @@ describe('/asset', () => {
         expected: {
           type: AssetTypeEnum.Image,
           originalFileName: '4_3.rw2',
-          resized: true,
           fileCreatedAt: '2018-05-10T08:42:37.842Z',
           exifInfo: {
             make: 'Panasonic',
@@ -1008,7 +1105,6 @@ describe('/asset', () => {
         expected: {
           type: AssetTypeEnum.Image,
           originalFileName: '12bit-compressed-(3_2).arw',
-          resized: true,
           fileCreatedAt: '2016-09-27T10:51:44.000Z',
           exifInfo: {
             make: 'SONY',
@@ -1033,7 +1129,6 @@ describe('/asset', () => {
         expected: {
           type: AssetTypeEnum.Image,
           originalFileName: '14bit-uncompressed-(3_2).arw',
-          resized: true,
           fileCreatedAt: '2016-01-08T14:08:01.000Z',
           exifInfo: {
             make: 'SONY',
