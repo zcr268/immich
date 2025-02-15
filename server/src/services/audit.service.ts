@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { DateTime } from 'luxon';
 import { resolve } from 'node:path';
-import { AUDIT_LOG_MAX_DURATION } from 'src/constants';
+import { AUDIT_LOG_MAX_DURATION, JOBS_ASSET_PAGINATION_SIZE } from 'src/constants';
 import { StorageCore } from 'src/cores/storage.core';
 import { OnJob } from 'src/decorators';
 import {
@@ -17,12 +17,14 @@ import {
   AssetFileType,
   AssetPathType,
   DatabaseAction,
+  JobName,
+  JobStatus,
   Permission,
   PersonPathType,
+  QueueName,
   StorageFolder,
   UserPathType,
 } from 'src/enum';
-import { JobName, JOBS_ASSET_PAGINATION_SIZE, JobStatus, QueueName } from 'src/interfaces/job.interface';
 import { BaseService } from 'src/services/base.service';
 import { getAssetFiles } from 'src/utils/asset.util';
 import { usePagination } from 'src/utils/pagination';
@@ -201,20 +203,21 @@ export class AuditService extends BaseService {
       }
     }
 
-    const personPagination = usePagination(JOBS_ASSET_PAGINATION_SIZE, (pagination) =>
-      this.personRepository.getAll(pagination),
-    );
-    for await (const people of personPagination) {
-      for (const { id, thumbnailPath } of people) {
-        track(thumbnailPath);
-        const entity = { entityId: id, entityType: PathEntityType.PERSON };
-        if (thumbnailPath && !hasFile(thumbFiles, thumbnailPath)) {
-          orphans.push({ ...entity, pathType: PersonPathType.FACE, pathValue: thumbnailPath });
-        }
+    let peopleCount = 0;
+    for await (const { id, thumbnailPath } of this.personRepository.getAll()) {
+      track(thumbnailPath);
+      const entity = { entityId: id, entityType: PathEntityType.PERSON };
+      if (thumbnailPath && !hasFile(thumbFiles, thumbnailPath)) {
+        orphans.push({ ...entity, pathType: PersonPathType.FACE, pathValue: thumbnailPath });
       }
 
-      this.logger.log(`Found ${assetCount} assets, ${users.length} users, ${people.length} people`);
+      if (peopleCount === JOBS_ASSET_PAGINATION_SIZE) {
+        this.logger.log(`Found ${assetCount} assets, ${users.length} users, ${peopleCount} people`);
+        peopleCount = 0;
+      }
     }
+
+    this.logger.log(`Found ${assetCount} assets, ${users.length} users, ${peopleCount} people`);
 
     const extras: string[] = [];
     for (const file of allFiles) {

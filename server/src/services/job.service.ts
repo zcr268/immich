@@ -3,18 +3,19 @@ import { snakeCase } from 'lodash';
 import { OnEvent } from 'src/decorators';
 import { mapAsset } from 'src/dtos/asset-response.dto';
 import { AllJobStatusResponseDto, JobCommandDto, JobCreateDto, JobStatusDto } from 'src/dtos/job.dto';
-import { AssetType, ImmichWorker, ManualJobName } from 'src/enum';
-import { ArgOf, ArgsOf } from 'src/interfaces/event.interface';
 import {
-  ConcurrentQueueName,
+  AssetType,
+  ImmichWorker,
   JobCommand,
-  JobItem,
   JobName,
   JobStatus,
+  ManualJobName,
   QueueCleanType,
   QueueName,
-} from 'src/interfaces/job.interface';
+} from 'src/enum';
+import { ArgOf, ArgsOf } from 'src/repositories/event.repository';
 import { BaseService } from 'src/services/base.service';
+import { ConcurrentQueueName, JobItem } from 'src/types';
 
 const asJobItem = (dto: JobCreateDto): JobItem => {
   switch (dto.name) {
@@ -51,7 +52,7 @@ export class JobService extends BaseService {
     }
   }
 
-  @OnEvent({ name: 'config.update', server: true })
+  @OnEvent({ name: 'config.update', server: true, workers: [ImmichWorker.MICROSERVICES] })
   onConfigUpdate({ newConfig: config }: ArgOf<'config.update'>) {
     this.onConfigInit({ newConfig: config });
   }

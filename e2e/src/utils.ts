@@ -6,6 +6,8 @@ import {
   CheckExistingAssetsDto,
   CreateAlbumDto,
   CreateLibraryDto,
+  JobCommandDto,
+  JobName,
   MetadataSearchDto,
   Permission,
   PersonCreateDto,
@@ -29,6 +31,7 @@ import {
   getConfigDefaults,
   login,
   searchAssets,
+  sendJobCommand,
   setBaseUrl,
   signUpAdmin,
   tagAssets,
@@ -76,6 +79,7 @@ export const immichCli = (args: string[]) =>
 export const immichAdmin = (args: string[]) =>
   executeCommand('docker', ['exec', '-i', 'immich-e2e-server', '/bin/bash', '-c', `immich-admin ${args.join(' ')}`]);
 export const specialCharStrings = ["'", '"', ',', '{', '}', '*'];
+export const TEN_TIMES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 const executeCommand = (command: string, args: string[]) => {
   let _resolve: (value: CommandResponse) => void;
@@ -473,6 +477,9 @@ export const utils = {
 
   tagAssets: (accessToken: string, tagId: string, assetIds: string[]) =>
     tagAssets({ id: tagId, bulkIdsDto: { ids: assetIds } }, { headers: asBearerAuth(accessToken) }),
+
+  jobCommand: async (accessToken: string, jobName: JobName, jobCommandDto: JobCommandDto) =>
+    sendJobCommand({ id: jobName, jobCommandDto }, { headers: asBearerAuth(accessToken) }),
 
   setAuthCookies: async (context: BrowserContext, accessToken: string, domain = '127.0.0.1') =>
     await context.addCookies([
