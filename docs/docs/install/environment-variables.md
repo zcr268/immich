@@ -159,15 +159,17 @@ Redis (Sentinel) URL example JSON before encoding:
 | `MACHINE_LEARNING_WORKERS`<sup>\*2</sup>                    | Number of worker processes to spawn                                                                 |               `1`               | machine learning |
 | `MACHINE_LEARNING_HTTP_KEEPALIVE_TIMEOUT_S`<sup>\*3</sup>   | HTTP Keep-alive time in seconds                                                                     |               `2`               | machine learning |
 | `MACHINE_LEARNING_WORKER_TIMEOUT`                           | Maximum time (s) of unresponsiveness before a worker is killed                                      | `120` (`300` if using OpenVINO) | machine learning |
-| `MACHINE_LEARNING_PRELOAD__CLIP__TEXTUAL`                   | Name of the textual CLIP model to be preloaded and kept in cache                                    |                                 | machine learning |
-| `MACHINE_LEARNING_PRELOAD__CLIP__VISUAL`                    | Name of the visual CLIP model to be preloaded and kept in cache                                     |                                 | machine learning |
-| `MACHINE_LEARNING_PRELOAD__FACIAL_RECOGNITION__RECOGNITION` | Name of the recognition portion of the facial recognition model to be preloaded and kept in cache   |                                 | machine learning |
-| `MACHINE_LEARNING_PRELOAD__FACIAL_RECOGNITION__DETECTION`   | Name of the detection portion of the facial recognition model to be preloaded and kept in cache     |                                 | machine learning |
+| `MACHINE_LEARNING_PRELOAD__CLIP__TEXTUAL`                   | Comma-separated list of (textual) CLIP model(s) to preload and cache                                |                                 | machine learning |
+| `MACHINE_LEARNING_PRELOAD__CLIP__VISUAL`                    | Comma-separated list of (visual) CLIP model(s) to preload and cache                                 |                                 | machine learning |
+| `MACHINE_LEARNING_PRELOAD__FACIAL_RECOGNITION__RECOGNITION` | Comma-separated list of (recognition) facial recognition model(s) to preload and cache              |                                 | machine learning |
+| `MACHINE_LEARNING_PRELOAD__FACIAL_RECOGNITION__DETECTION`   | Comma-separated list of (detection) facial recognition model(s) to preload and cache                |                                 | machine learning |
 | `MACHINE_LEARNING_ANN`                                      | Enable ARM-NN hardware acceleration if supported                                                    |             `True`              | machine learning |
 | `MACHINE_LEARNING_ANN_FP16_TURBO`                           | Execute operations in FP16 precision: increasing speed, reducing precision (applies only to ARM-NN) |             `False`             | machine learning |
 | `MACHINE_LEARNING_ANN_TUNING_LEVEL`                         | ARM-NN GPU tuning level (1: rapid, 2: normal, 3: exhaustive)                                        |               `2`               | machine learning |
 | `MACHINE_LEARNING_DEVICE_IDS`<sup>\*4</sup>                 | Device IDs to use in multi-GPU environments                                                         |               `0`               | machine learning |
 | `MACHINE_LEARNING_MAX_BATCH_SIZE__FACIAL_RECOGNITION`       | Set the maximum number of faces that will be processed at once by the facial recognition model      |  None (`1` if using OpenVINO)   | machine learning |
+| `MACHINE_LEARNING_PING_TIMEOUT`                             | How long (ms) to wait for a PING response when checking if an ML server is available                |             `2000`              | server           |
+| `MACHINE_LEARNING_AVAILABILITY_BACKOFF_TIME`                | How long to ignore ML servers that are offline before trying again                                  |             `30000`             | server           |
 
 \*1: It is recommended to begin with this parameter when changing the concurrency levels of the machine learning service and then tune the other ones.
 
